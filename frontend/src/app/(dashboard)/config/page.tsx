@@ -27,6 +27,14 @@ export default function ConfigPage() {
   // User form
   const [uForm, setUForm] = useState({ name: "", email: "", password: "", is_superadmin: false, active: true, tenant_roles: [] as any[] });
   const [editUser, setEditUser] = useState<any>(null);
+  const [editUForm, setEditUForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    is_superadmin: false,
+    active: true,
+    tenant_roles: [] as { tenant_id: number; role: string }[],
+  });
 
   // Account
   const [newPwd, setNewPwd]     = useState("");
@@ -79,14 +87,9 @@ export default function ConfigPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const isSuper = isSuperAdmin();
-      const promises: Promise<any>[] = [tenantsApi.list()];
-      if (isSuper) {
-        promises.push(usersApi.list());
-      }
-      const [ts, us] = await Promise.all(promises);
+      const [ts, us] = await Promise.all([tenantsApi.list(), usersApi.list()]);
       setTenants(ts || []);
-      if (us) setUsers(us);
+      setUsers(us || []);
       const activeTid = getActiveTenantId();
       if (activeTid && ts?.some((t: any) => t.id === activeTid)) {
         setSelectedTenantForCC(activeTid);
@@ -151,6 +154,45 @@ export default function ConfigPage() {
     catch (e: any) { showToast(e.message, "error"); }
   }
 
+  function startEditUser(u: any) {
+    setEditUser(u);
+    setEditUForm({
+      name: u.name,
+      email: u.email,
+      password: "",
+      is_superadmin: !!u.is_superadmin,
+      active: u.active ?? true,
+      tenant_roles: (u.tenants || []).map((tr: any) => ({
+        tenant_id: tr.tenant.id,
+        role: tr.role,
+      })),
+    });
+  }
+
+  async function saveEditUser() {
+    if (!editUser) return;
+    try {
+      const payload: any = {
+        name: editUForm.name,
+        email: editUForm.email,
+        active: editUForm.active,
+        tenant_roles: editUForm.tenant_roles,
+      };
+      if (isSuperAdmin()) {
+        payload.is_superadmin = editUForm.is_superadmin;
+      }
+      if (editUForm.password.trim().length >= 6) {
+        payload.password = editUForm.password.trim();
+      }
+      await usersApi.update(editUser.id, payload);
+      showToast("Usuário atualizado com sucesso!");
+      setEditUser(null);
+      loadAll();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  }
+
   // ── Account ──────────────────────────────────────────────
   async function savePassword() {
     if (newPwd.length < 6) { showToast("Senha deve ter ao menos 6 caracteres.", "error"); return; }
@@ -186,7 +228,7 @@ export default function ConfigPage() {
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "cost_centers", label: "Centros de Custo", icon: "🏷️" },
     { key: "tenants",      label: isSuper ? "Tenants" : "Meu Tenant", icon: "🏢" },
-    ...(isSuper ? [{ key: "users" as Tab, label: "Usuários", icon: "👥" }] : []),
+    { key: "users",        label: "Usuários",         icon: "👥" },
     { key: "account",      label: "Minha Conta",      icon: "👤" },
   ];
 
@@ -464,7 +506,7 @@ export default function ConfigPage() {
           )}
 
           {/* ── USERS ── */}
-          {tab === "users" && isSuper && (
+          {tab === "users" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="card">
                 <h3 style={{ marginBottom: "16px" }}>Novo Usuário</h3>
@@ -486,11 +528,13 @@ export default function ConfigPage() {
                     <input type="password" className="form-input" value={uForm.password}
                       onChange={e => setUForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
                   </div>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", cursor: "pointer" }}>
-                    <input type="checkbox" checked={uForm.is_superadmin}
-                      onChange={e => setUForm(f => ({ ...f, is_superadmin: e.target.checked }))} />
-                    Superadmin
-                  </label>
+                  {isSuper && (
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", cursor: "pointer" }}>
+                      <input type="checkbox" checked={uForm.is_superadmin}
+                        onChange={e => setUForm(f => ({ ...f, is_superadmin: e.target.checked }))} />
+                      Superadmin
+                    </label>
+                  )}
                   <div>
                     <label className="form-label">Tenants de acesso</label>
                     {tenants.map(t => (
@@ -514,7 +558,7 @@ export default function ConfigPage() {
                             onClick={ev => ev.stopPropagation()}
                           >
                             <option value="user">Visualizador</option>
-                            <option value="admin">Admin</option>
+                            <option value="admin">Administrador</option>
                           </select>
                         )}
                       </label>
@@ -543,7 +587,26 @@ export default function ConfigPage() {
                         ))}
                       </div>
                     </div>
-                    <button className="btn btn-danger btn-sm" onClick={() => deleteUser(u.id)}>🗑️</button>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {(!u.is_superadmin || isSuper) && (
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => startEditUser(u)}
+                          style={{ fontSize: "0.78rem" }}
+                        >
+                          ✏️ Editar
+                        </button>
+                      )}
+                      {(!u.is_superadmin || isSuper) && (
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => deleteUser(u.id)}
+                          title="Excluir usuário"
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -656,6 +719,148 @@ export default function ConfigPage() {
                 </button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditTenant(null)}>
                   Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Edição de Usuário */}
+      {editUser && (
+        <div className="modal-overlay" onClick={() => setEditUser(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxWidth: "560px" }}>
+            <h2 style={{ marginBottom: "8px" }}>✏️ Editar Usuário — {editUser.name}</h2>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "20px" }}>
+              Altere os dados de acesso e gerencie os vínculos com os tenants delegados.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">Nome</label>
+                  <input
+                    className="form-input"
+                    value={editUForm.name}
+                    onChange={e => setEditUForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Nome completo"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={editUForm.email}
+                    onChange={e => setEditUForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="email@example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nova Senha (opcional)</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={editUForm.password}
+                  onChange={e => setEditUForm(f => ({ ...f, password: e.target.value }))}
+                  placeholder="Deixe em branco para não alterar"
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={editUForm.active}
+                    onChange={e => setEditUForm(f => ({ ...f, active: e.target.checked }))}
+                  />
+                  Usuário Ativo
+                </label>
+
+                {isSuper && (
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={editUForm.is_superadmin}
+                      onChange={e => setEditUForm(f => ({ ...f, is_superadmin: e.target.checked }))}
+                    />
+                    Superadmin
+                  </label>
+                )}
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 600 }}>Tenants de Acesso</label>
+                <div style={{
+                  display: "flex", flexDirection: "column", gap: "8px",
+                  padding: "10px", background: "var(--bg-elevated)",
+                  borderRadius: "var(--radius-md)", border: "1px solid var(--border)",
+                }}>
+                  {tenants.map(t => {
+                    const isChecked = editUForm.tenant_roles.some((r: any) => r.tenant_id === t.id);
+                    const currentRole = editUForm.tenant_roles.find((r: any) => r.tenant_id === t.id)?.role || "user";
+                    return (
+                      <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.85rem", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              setEditUForm(f => ({
+                                ...f,
+                                tenant_roles: e.target.checked
+                                  ? [...f.tenant_roles, { tenant_id: t.id, role: "user" }]
+                                  : f.tenant_roles.filter((r: any) => r.tenant_id !== t.id),
+                              }));
+                            }}
+                          />
+                          <span>🏢 {t.name}</span>
+                        </label>
+
+                        {isChecked && (
+                          <select
+                            style={{
+                              background: "var(--bg-surface)", border: "1px solid var(--border)",
+                              color: "var(--text-primary)", borderRadius: "var(--radius-sm)",
+                              padding: "4px 8px", fontSize: "0.78rem",
+                            }}
+                            value={currentRole}
+                            onChange={e => {
+                              setEditUForm(f => ({
+                                ...f,
+                                tenant_roles: f.tenant_roles.map((r: any) =>
+                                  r.tenant_id === t.id ? { ...r, role: e.target.value } : r
+                                ),
+                              }));
+                            }}
+                          >
+                            <option value="user">Visualizador</option>
+                            <option value="admin">Administrador</option>
+                          </select>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 2 }}
+                  onClick={saveEditUser}
+                  disabled={!editUForm.name || !editUForm.email}
+                >
+                  💾 Salvar Alterações
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setEditUser(null)}
+                >
+                  Cancelar
                 </button>
               </div>
             </div>
