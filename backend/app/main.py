@@ -41,6 +41,14 @@ def seed_admin():
 async def lifespan(app: FastAPI):
     # Startup
     Base.metadata.create_all(bind=engine)
+    # Garante a existência da coluna storage_url caso a tabela já tenha sido criada
+    from sqlalchemy import text
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE tenants ADD COLUMN storage_url TEXT NULL"))
+            conn.commit()
+    except Exception:
+        pass  # Coluna já existe ou erro ignorado
     seed_admin()
     start_scheduler()
     yield

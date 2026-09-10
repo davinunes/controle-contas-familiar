@@ -10,6 +10,7 @@ class Tenant(Base):
     id            = Column(Integer, primary_key=True, index=True)
     name          = Column(String(100), nullable=False)
     slug          = Column(String(50), unique=True, nullable=False)
+    storage_url   = Column(Text, nullable=True)  # URL Pré-autenticada (PAR) da Oracle
     s3_endpoint   = Column(String(255), nullable=True)
     s3_bucket     = Column(String(100), nullable=True)
     s3_access_key = Column(String(255), nullable=True)

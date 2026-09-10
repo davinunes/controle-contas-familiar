@@ -35,8 +35,8 @@ async def upload_attachment(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
 
-    if not tenant.s3_bucket:
-        raise HTTPException(status_code=400, detail="S3 não configurado para este tenant")
+    if not tenant.storage_url and not tenant.s3_bucket:
+        raise HTTPException(status_code=400, detail="Storage não configurado para este tenant (configure a URL pré-autenticada nas configurações)")
 
     # Validação do tipo de arquivo
     content_type = file.content_type or ""

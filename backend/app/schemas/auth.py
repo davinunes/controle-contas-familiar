@@ -49,12 +49,14 @@ class UserMe(BaseModel):
 
 # ── Tenant CRUD ──────────────────────────────────────────────
 class TenantCreate(BaseModel):
-    name: str = Field(..., min_length=2, max_length=100)
-    slug: str = Field(..., min_length=2, max_length=50, pattern=r"^[a-z0-9\-]+$")
+    name:        str = Field(..., min_length=2, max_length=100)
+    slug:        str = Field(..., min_length=2, max_length=50, pattern=r"^[a-z0-9\-]+$")
+    storage_url: Optional[str] = None
 
 
 class TenantUpdate(BaseModel):
     name:          Optional[str] = None
+    storage_url:   Optional[str] = None
     s3_endpoint:   Optional[str] = None
     s3_bucket:     Optional[str] = None
     s3_access_key: Optional[str] = None
@@ -66,6 +68,7 @@ class TenantOut(BaseModel):
     id:            int
     name:          str
     slug:          str
+    storage_url:   Optional[str]
     s3_endpoint:   Optional[str]
     s3_bucket:     Optional[str]
     s3_prefix:     Optional[str]

@@ -16,7 +16,8 @@ export default function ConfigPage() {
   // Tenant form
   const [tForm, setTForm] = useState({ name: "", slug: "" });
   const [editTenant, setEditTenant] = useState<any>(null);
-  const [tS3, setTS3] = useState({ s3_endpoint: "", s3_bucket: "", s3_access_key: "", s3_secret_key: "", s3_prefix: "" });
+  const [tS3, setTS3] = useState({ storage_url: "", s3_endpoint: "", s3_bucket: "", s3_access_key: "", s3_secret_key: "", s3_prefix: "" });
+  const [showLegacyS3, setShowLegacyS3] = useState(false);
 
   // User form
   const [uForm, setUForm] = useState({ name: "", email: "", password: "", is_superadmin: false, active: true, tenant_roles: [] as any[] });
@@ -202,8 +203,19 @@ export default function ConfigPage() {
                     </div>
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button className="btn btn-secondary btn-sm"
-                        onClick={() => { setEditTenant(t); setTS3({ s3_endpoint: t.s3_endpoint||"", s3_bucket: t.s3_bucket||"", s3_access_key: "", s3_secret_key: "", s3_prefix: t.s3_prefix||"" }); }}>
-                        🔧 S3
+                        onClick={() => {
+                          setEditTenant(t);
+                          setTS3({
+                            storage_url: t.storage_url || "",
+                            s3_endpoint: t.s3_endpoint || "",
+                            s3_bucket: t.s3_bucket || "",
+                            s3_access_key: "",
+                            s3_secret_key: "",
+                            s3_prefix: t.s3_prefix || "",
+                          });
+                          setShowLegacyS3(false);
+                        }}>
+                        📦 Storage
                       </button>
                       <button className="btn btn-secondary btn-sm" onClick={() => testS3(t.id)}>
                         🧪 Testar
@@ -213,9 +225,18 @@ export default function ConfigPage() {
                       </button>
                     </div>
                   </div>
-                  {t.s3_bucket && (
+                  {t.storage_url ? (
+                    <div style={{ fontSize: "0.78rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span>🟢</span>
+                      <span>URL Pré-autenticada (PAR) ativa</span>
+                    </div>
+                  ) : t.s3_bucket ? (
                     <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis" }}>
                       Bucket: {t.s3_bucket} · Prefix: {t.s3_prefix || "(raiz)"}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                      ⚠️ Storage não configurado
                     </div>
                   )}
                 </div>
@@ -328,48 +349,94 @@ export default function ConfigPage() {
         </>
       )}
 
-      {/* S3 Modal */}
+      {/* Storage / PAR Modal */}
       {editTenant && (
         <div className="modal-overlay" onClick={() => setEditTenant(null)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <h2 style={{ marginBottom: "20px" }}>🔧 S3 — {editTenant.name}</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxWidth: "560px" }}>
+            <h2 style={{ marginBottom: "8px" }}>📦 Armazenamento — {editTenant.name}</h2>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "20px" }}>
+              Cole a URL Pré-autenticada gerada no Oracle Object Storage para upload e visualização das notas fiscais e comprovantes.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="form-group">
-                <label className="form-label">Endpoint S3</label>
-                <input className="form-input" value={tS3.s3_endpoint}
-                  onChange={e => setTS3(s => ({ ...s, s3_endpoint: e.target.value }))}
-                  placeholder="https://xyz.compat.objectstorage.sa-saopaulo-1.oraclecloud.com" />
+                <label className="form-label" style={{ fontWeight: 600, color: "var(--text-base)" }}>
+                  URL Pré-autenticada (PAR) da Oracle
+                </label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  value={tS3.storage_url}
+                  onChange={e => setTS3(s => ({ ...s, storage_url: e.target.value }))}
+                  placeholder="https://objectstorage.sa-saopaulo-1.oraclecloud.com/p/.../n/.../b/.../o/"
+                  style={{ fontSize: "0.82rem", fontFamily: "monospace", resize: "vertical" }}
+                />
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", lineHeight: "1.4" }}>
+                  💡 <b>Como obter no Oracle Cloud:</b> Vá no seu Bucket ➔ menu lateral <b>Pre-Authenticated Requests</b> ➔ clique em <b>Create</b> ➔ Selecione <b>Bucket</b> e marque <b>Permit object reads and writes</b> ➔ Cole a URL inteira aqui.
+                </span>
               </div>
-              <div className="form-group">
-                <label className="form-label">Bucket</label>
-                <input className="form-input" value={tS3.s3_bucket}
-                  onChange={e => setTS3(s => ({ ...s, s3_bucket: e.target.value }))}
-                  placeholder="nome-do-bucket" />
+
+              {/* Opções S3 Legadas */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowLegacyS3(!showLegacyS3)}
+                  style={{
+                    background: "none", border: "none", color: "var(--text-muted)",
+                    fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", padding: 0
+                  }}
+                >
+                  {showLegacyS3 ? "▲ Ocultar opções legadas S3" : "▼ Ou configurar via credenciais S3 legadas (Access/Secret Key)"}
+                </button>
               </div>
-              <div className="form-group">
-                <label className="form-label">Access Key</label>
-                <input className="form-input" value={tS3.s3_access_key}
-                  onChange={e => setTS3(s => ({ ...s, s3_access_key: e.target.value }))}
-                  placeholder="Deixe vazio para não alterar" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Secret Key</label>
-                <input type="password" className="form-input" value={tS3.s3_secret_key}
-                  onChange={e => setTS3(s => ({ ...s, s3_secret_key: e.target.value }))}
-                  placeholder="Deixe vazio para não alterar" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Prefix (pasta)</label>
-                <input className="form-input" value={tS3.s3_prefix}
-                  onChange={e => setTS3(s => ({ ...s, s3_prefix: e.target.value }))}
-                  placeholder="Ex: organizar/sogros" />
-              </div>
+
+              {showLegacyS3 && (
+                <div style={{
+                  display: "flex", flexDirection: "column", gap: "12px",
+                  padding: "14px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)"
+                }}>
+                  <div className="form-group">
+                    <label className="form-label">Endpoint S3</label>
+                    <input className="form-input" value={tS3.s3_endpoint}
+                      onChange={e => setTS3(s => ({ ...s, s3_endpoint: e.target.value }))}
+                      placeholder="https://xyz.compat.objectstorage.sa-saopaulo-1.oraclecloud.com" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Bucket</label>
+                    <input className="form-input" value={tS3.s3_bucket}
+                      onChange={e => setTS3(s => ({ ...s, s3_bucket: e.target.value }))}
+                      placeholder="nome-do-bucket" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Access Key</label>
+                    <input className="form-input" value={tS3.s3_access_key}
+                      onChange={e => setTS3(s => ({ ...s, s3_access_key: e.target.value }))}
+                      placeholder="Deixe vazio para não alterar" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Secret Key</label>
+                    <input type="password" className="form-input" value={tS3.s3_secret_key}
+                      onChange={e => setTS3(s => ({ ...s, s3_secret_key: e.target.value }))}
+                      placeholder="Deixe vazio para não alterar" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Prefix (pasta)</label>
+                    <input className="form-input" value={tS3.s3_prefix}
+                      onChange={e => setTS3(s => ({ ...s, s3_prefix: e.target.value }))}
+                      placeholder="Ex: organizar/sogros" />
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={updateTenantS3}>
-                  💾 Salvar S3
+                <button className="btn btn-primary" style={{ flex: 2 }} onClick={updateTenantS3}>
+                  💾 Salvar Armazenamento
+                </button>
+                <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => testS3(editTenant.id)}>
+                  🧪 Testar
                 </button>
                 <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setEditTenant(null)}>
-                  Cancelar
+                  Fechar
                 </button>
               </div>
             </div>
