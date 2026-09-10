@@ -148,7 +148,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 INSERT IGNORE INTO users (name, email, password_hash, is_superadmin, active)
 VALUES (
     'Administrador',
-    'admin@organize.local',
+    'admin@admin.com',
     '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.PcEBrG',
     1,
     1
