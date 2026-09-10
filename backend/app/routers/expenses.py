@@ -79,6 +79,23 @@ def create_expense(
         db.add(occ)
         db.commit()
 
+    # Para recorrentes: gera 1 ocorrência no mês atual imediatamente
+    elif expense.type == "recurring":
+        today = date.today()
+        ref_month = date(today.year, today.month, 1)
+        from calendar import monthrange
+        day = expense.recurrence_day or 1
+        last_day = monthrange(today.year, today.month)[1]
+        occ = Occurrence(
+            expense_id=expense.id,
+            tenant_id=tenant_id,
+            reference_month=ref_month,
+            value=0,
+            due_date=date(today.year, today.month, min(day, last_day)),
+        )
+        db.add(occ)
+        db.commit()
+
     return expense
 
 

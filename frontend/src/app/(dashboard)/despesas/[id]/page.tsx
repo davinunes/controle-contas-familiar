@@ -55,10 +55,31 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
   async function handleSave() {
     setSaving(true);
     try {
-      await expensesApi.update(Number(id), editData);
+      const payload: any = {
+        title: editData.title?.trim(),
+        description: editData.description?.trim() || null,
+        person_id: editData.person_id ? Number(editData.person_id) : null,
+        cost_center_id: editData.cost_center_id ? Number(editData.cost_center_id) : null,
+      };
+      if (editData.recurrence_day !== "" && editData.recurrence_day != null) {
+        payload.recurrence_day = Number(editData.recurrence_day);
+      } else {
+        payload.recurrence_day = null;
+      }
+      await expensesApi.update(Number(id), payload);
       const updated = await expensesApi.get(Number(id));
       setExpense(updated);
+      setEditData({
+        title: updated.title,
+        description: updated.description || "",
+        person_id: updated.person_id ? String(updated.person_id) : "",
+        cost_center_id: updated.cost_center_id ? String(updated.cost_center_id) : "",
+        recurrence_day: updated.recurrence_day || "",
+        important_details: updated.important_details || [],
+      });
       setEditing(false);
+    } catch (err: any) {
+      alert(err.message || "Erro ao salvar alterações da despesa");
     } finally {
       setSaving(false);
     }

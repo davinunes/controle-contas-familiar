@@ -303,25 +303,40 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 /* ── Modal Overlay ──────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
   animation: fadeIn 0.2s ease;
 }
 .modal-sheet {
   background: var(--bg-elevated);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
-  border-bottom: none;
-  padding: 24px 20px;
+  padding: 24px;
   width: 100%;
-  max-width: 680px;
-  max-height: 90dvh;
+  max-width: 580px;
+  max-height: 85dvh;
   overflow-y: auto;
-  animation: slideUp 0.3s ease;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (max-width: 480px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-sheet {
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-bottom: none;
+    max-height: 88dvh;
+    padding: 20px 16px calc(24px + env(safe-area-inset-bottom, 16px));
+    animation: slideUp 0.3s ease;
+  }
+}
+@keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp  { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes modalPop { from { transform: scale(0.96) translateY(8px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
 
 /* ── Loading ────────────────────────────────────────────────── */
 .spinner {

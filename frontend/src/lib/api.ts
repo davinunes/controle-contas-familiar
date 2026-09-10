@@ -32,7 +32,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    let msg = `HTTP ${res.status}`;
+    if (typeof err.detail === "string") {
+      msg = err.detail;
+    } else if (Array.isArray(err.detail)) {
+      msg = err.detail.map((d: any) => `${d.loc?.slice(1).join('.') || 'campo'}: ${d.msg}`).join("; ");
+    }
+    throw new Error(msg);
   }
 
   if (res.status === 204) return undefined as T;

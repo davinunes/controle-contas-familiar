@@ -56,6 +56,20 @@ async def lifespan(app: FastAPI):
                 pass  # Coluna já existe ou erro ignorado
     seed_admin()
     start_scheduler()
+
+    # Gera ocorrências do mês corrente para despesas ativas existentes
+    try:
+        from app.services.occurrence_service import generate_occurrences_for_month
+        from app.database import SessionLocal
+        from datetime import date
+        with SessionLocal() as db_session:
+            today = date.today()
+            count = generate_occurrences_for_month(db_session, today.year, today.month)
+            if count > 0:
+                print(f"[Startup] {count} novas ocorrências geradas para {today.year}-{today.month:02d}", flush=True)
+    except Exception as e:
+        print(f"[Startup] Erro ao sincronizar ocorrências do mês: {e}", flush=True)
+
     yield
     # Shutdown
     stop_scheduler()

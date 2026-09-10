@@ -13,6 +13,8 @@ from app.models.user import User
 from app.routers.auth import get_current_user
 from app.schemas.expense import DashboardSummary, FiadoData, ResumoItem
 
+from app.services.occurrence_service import generate_occurrences_for_month
+
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
@@ -40,6 +42,12 @@ def get_resumo(
     except ValueError:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Formato inválido. Use YYYY-MM")
+
+    # Garante que despesas recorrentes ativas tenham ocorrência criada para o mês visualizado
+    try:
+        generate_occurrences_for_month(db, ref_month.year, ref_month.month)
+    except Exception:
+        pass
 
     # Ocorrências do mês
     current_occs = (

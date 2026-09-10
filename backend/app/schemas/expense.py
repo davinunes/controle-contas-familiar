@@ -27,6 +27,14 @@ class ExpenseCreate(BaseModel):
     important_details:  Optional[List[ImportantDetail]] = None
 
 
+    @field_validator("cost_center_id", "person_id", "recurrence_day", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+
 class ExpenseUpdate(BaseModel):
     title:              Optional[str] = None
     description:        Optional[str] = None
@@ -38,6 +46,13 @@ class ExpenseUpdate(BaseModel):
     recurrence_day:     Optional[int] = Field(None, ge=1, le=31)
     important_details:  Optional[List[ImportantDetail]] = None
     active:             Optional[bool] = None
+
+    @field_validator("cost_center_id", "person_id", "recurrence_day", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class ExpenseOut(BaseModel):
