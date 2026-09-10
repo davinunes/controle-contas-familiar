@@ -28,11 +28,11 @@ def seed_admin():
             )
             db.add(admin)
             db.commit()
-            print("[Seed] Superadmin criado: admin@admin.com / Admin@123")
+            print("[Seed] Superadmin criado: admin@admin.com / Admin@123", flush=True)
         else:
-            print("[Seed] Usuários já existem, seed ignorado.")
+            print("[Seed] Usuários já existem, seed ignorado.", flush=True)
     except Exception as e:
-        print(f"[Seed] Erro: {e}")
+        print(f"[Seed] Erro: {e}", flush=True)
     finally:
         db.close()
 
