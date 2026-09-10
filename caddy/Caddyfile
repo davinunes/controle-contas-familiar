@@ -1,0 +1,19 @@
+organize.davinunes.eti.br, organize.digitalinovation.com.br {
+    # Proxy para a API do backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # Proxy para o frontend Next.js
+    handle {
+        reverse_proxy frontend:3000
+    }
+
+    # Compressão
+    encode gzip
+
+    # Logs
+    log {
+        output file /var/log/caddy/access.log
+    }
+}

@@ -1,0 +1,65 @@
+services:
+  # ── Backend FastAPI ──────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: organizar_backend
+    env_file: .env
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - ALLOWED_ORIGINS=https://organize.davinunes.eti.br,https://organize.digitalinovation.com.br
+    restart: unless-stopped
+    networks:
+      - organizar_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Frontend Next.js ─────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: organizar_frontend
+    env_file: .env
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+      - BACKEND_INTERNAL_URL=http://backend:8000
+    restart: unless-stopped
+    networks:
+      - organizar_net
+    depends_on:
+      - backend
+
+  # ── Caddy (SSL automático) ───────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: organizar_caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    restart: unless-stopped
+    networks:
+      - organizar_net
+    depends_on:
+      - frontend
+      - backend
+
+networks:
+  organizar_net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+node_modules/
+.next/
+.DS_Store
+*.log
+caddy_data/
+caddy_config/
