@@ -16,14 +16,24 @@ bearer = HTTPBearer(auto_error=False)
 
 
 def _build_user_me(user: User, db: Session) -> UserMe:
-    links = db.query(UserTenant).filter(UserTenant.user_id == user.id).all()
-    tenants = [
-        UserTenantRole(
-            tenant=TenantBrief.model_validate(link.tenant),
-            role=link.role,
-        )
-        for link in links
-    ]
+    if user.is_superadmin:
+        all_tenants = db.query(Tenant).order_by(Tenant.name).all()
+        tenants = [
+            UserTenantRole(
+                tenant=TenantBrief.model_validate(t),
+                role="admin",
+            )
+            for t in all_tenants
+        ]
+    else:
+        links = db.query(UserTenant).filter(UserTenant.user_id == user.id).all()
+        tenants = [
+            UserTenantRole(
+                tenant=TenantBrief.model_validate(link.tenant),
+                role=link.role,
+            )
+            for link in links
+        ]
     return UserMe(
         id=user.id,
         name=user.name,
