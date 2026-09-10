@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import get_settings
-from app.database import engine
+from app.database import engine, SessionLocal
 from app.models import Tenant, User, UserTenant, RefreshToken, Expense, Occurrence, Attachment
 from app.database import Base
 from app.scheduler import start_scheduler, stop_scheduler
@@ -12,10 +12,36 @@ from app.routers import auth, tenants, users, expenses, occurrences, attachments
 settings = get_settings()
 
 
+def seed_admin():
+    """Cria o superadmin padrão se não houver nenhum usuário no banco."""
+    from app.models.user import User as UserModel
+    from app.services.auth_service import hash_password
+    db = SessionLocal()
+    try:
+        if db.query(UserModel).count() == 0:
+            admin = UserModel(
+                name="Administrador",
+                email="admin@admin.com",
+                password_hash=hash_password("Admin@123"),
+                is_superadmin=True,
+                active=True,
+            )
+            db.add(admin)
+            db.commit()
+            print("[Seed] Superadmin criado: admin@admin.com / Admin@123")
+        else:
+            print("[Seed] Usuários já existem, seed ignorado.")
+    except Exception as e:
+        print(f"[Seed] Erro: {e}")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     Base.metadata.create_all(bind=engine)
+    seed_admin()
     start_scheduler()
     yield
     # Shutdown
