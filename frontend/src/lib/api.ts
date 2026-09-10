@@ -180,4 +180,8 @@ export const dashboardApi = {
   },
   fiado: (tenantId: number) =>
     request<any>(`/dashboard/fiado?tenant_id=${tenantId}`),
+  generateOccurrences: (tenantId: number, year: number, month: number) =>
+    request<{ created: number }>(`/dashboard/generate-occurrences?tenant_id=${tenantId}&year=${year}&month=${month}`, {
+      method: "POST",
+    }),
 };

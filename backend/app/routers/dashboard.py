@@ -43,11 +43,14 @@ def get_resumo(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Formato inválido. Use YYYY-MM")
 
-    # Garante que despesas recorrentes ativas tenham ocorrência criada para o mês visualizado
-    try:
-        generate_occurrences_for_month(db, ref_month.year, ref_month.month)
-    except Exception:
-        pass
+    # Só gera automaticamente se for mês atual ou futuro (trava para meses passados)
+    today = date.today()
+    current_first_day = date(today.year, today.month, 1)
+    if ref_month >= current_first_day:
+        try:
+            generate_occurrences_for_month(db, ref_month.year, ref_month.month, tenant_id=tenant_id)
+        except Exception:
+            pass
 
     # Ocorrências do mês
     current_occs = (
@@ -268,13 +271,18 @@ def get_fiado(
 def trigger_generate(
     year: int = Query(...),
     month: int = Query(...),
+    tenant_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Endpoint manual para gerar ocorrências de um mês específico (admin)."""
-    if not current_user.is_superadmin:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Apenas superadmin")
+    """Endpoint manual para gerar ocorrências de um mês específico."""
+    if tenant_id is not None:
+        from app.routers.expenses import _check_tenant_access
+        _check_tenant_access(db, current_user, tenant_id)
+    else:
+        if not current_user.is_superadmin:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Apenas superadmin pode gerar para todos os tenants")
     from app.services.occurrence_service import generate_occurrences_for_month
-    count = generate_occurrences_for_month(db, year, month)
+    count = generate_occurrences_for_month(db, year, month, tenant_id=tenant_id)
     return {"created": count}

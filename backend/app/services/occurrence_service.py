@@ -17,20 +17,19 @@ def _due_date_for_month(day: int, year: int, month: int) -> date:
     return date(year, month, min(day, last_day))
 
 
-def generate_occurrences_for_month(db: Session, year: int, month: int) -> int:
+def generate_occurrences_for_month(db: Session, year: int, month: int, tenant_id: int | None = None) -> int:
     """
-    Gera as ocorrências do mês para todas as despesas ativas de todos os tenants.
-    Chamado pelo APScheduler no dia 1º de cada mês.
+    Gera as ocorrências do mês para todas as despesas ativas (de um tenant ou de todos).
+    Chamado pelo APScheduler no dia 1º de cada mês ou sob demanda.
     Retorna o número de ocorrências criadas.
     """
     reference_month = _first_of_month(year, month)
     created = 0
 
-    expenses: list[Expense] = (
-        db.query(Expense)
-        .filter(Expense.active == True)
-        .all()
-    )
+    query = db.query(Expense).filter(Expense.active == True)
+    if tenant_id is not None:
+        query = query.filter(Expense.tenant_id == tenant_id)
+    expenses: list[Expense] = query.all()
 
     for expense in expenses:
         # Verifica se já existe ocorrência para este mês

@@ -45,6 +45,7 @@ export default function ResumoPage() {
   const [marking, setMarking]                   = useState<number | null>(null);
   const [showQrScanner, setShowQrScanner]       = useState(false);
   const [qrProcessing, setQrProcessing]         = useState(false);
+  const [generating, setGenerating]             = useState(false);
 
   const tenantId = getActiveTenantId();
 
@@ -103,11 +104,26 @@ export default function ResumoPage() {
     try {
       const res = await expensesApi.quickQr(tenantId, qrUrl);
       showToast("Nota Fiscal capturada! Redirecionando... ⚡");
-      router.push(`/despesas/${res.expense_id}/${res.occurrence_id}`);
-    } catch (err: any) {
-      alert(err.message || "Erro ao processar QR Code.");
+      router.push(`/despesas/ocorrencia/${res.occurrence_id}`);
+    } catch (e: any) {
+      showToast(e.message, "error");
     } finally {
       setQrProcessing(false);
+    }
+  }
+
+  async function handleGenerateForMonth() {
+    if (!tenantId) return;
+    setGenerating(true);
+    try {
+      const [year, mo] = month.split("-").map(Number);
+      const res = await dashboardApi.generateOccurrences(tenantId, year, mo);
+      showToast(`${res.created} ocorrência(s) criada(s) para ${monthLabel}`);
+      await load();
+    } catch (e: any) {
+      showToast(e.message, "error");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -190,6 +206,29 @@ export default function ResumoPage() {
         </span>
         <button className="btn btn-secondary btn-sm btn-icon" onClick={nextMonth}>▶</button>
       </div>
+
+      {/* Aviso de mês anterior e botão para gerar sob demanda */}
+      {month < currentMonth() && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "10px 14px", marginBottom: "16px",
+          background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)", fontSize: "0.85rem", gap: "10px", flexWrap: "wrap",
+        }}>
+          <span style={{ color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>🗓️</span>
+            <span>Mês anterior: a geração automática de recorrências fica travada.</span>
+          </span>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleGenerateForMonth}
+            disabled={generating || loading}
+            style={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}
+          >
+            {generating ? "Gerando..." : `⚡ Gerar recorrências de ${monthLabel}`}
+          </button>
+        </div>
+      )}
 
       {/* Filtro por Responsável / Pessoa (se houver) */}
       {availablePersons.length > 0 && (
@@ -325,13 +364,25 @@ export default function ResumoPage() {
         <div className="loading-center"><div className="spinner" /></div>
       ) : displayedItems.length === 0 ? (
         <div className="empty-state">
-          <div style={{ fontSize: "3rem" }}>🎉</div>
+          <div style={{ fontSize: "3rem" }}>{month < currentMonth() ? "🗓️" : "🎉"}</div>
           <h3 style={{ marginTop: "12px", color: "var(--text-secondary)" }}>
             {selectedPerson !== "all" ? `Nenhuma conta para ${activePersonObj?.name}` : "Nenhuma conta este mês"}
           </h3>
-          <p style={{ marginTop: "8px", fontSize: "0.85rem" }}>
-            Adicione despesas ou aguarde a geração automática.
+          <p style={{ marginTop: "8px", fontSize: "0.85rem", color: "var(--text-muted)" }}>
+            {month < currentMonth()
+              ? "As despesas recorrentes não foram geradas automaticamente para este mês passado."
+              : "Adicione despesas ou aguarde a geração automática."}
           </p>
+          {month < currentMonth() && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleGenerateForMonth}
+              disabled={generating || loading}
+              style={{ marginTop: "16px" }}
+            >
+              {generating ? "Gerando..." : `⚡ Gerar contas recorrentes de ${monthLabel}`}
+            </button>
+          )}
         </div>
       ) : (
         <>
