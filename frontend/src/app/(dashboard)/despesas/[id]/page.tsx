@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { expensesApi, occurrencesApi, costCentersApi } from "@/lib/api";
 
@@ -9,8 +9,8 @@ function formatBRL(v: number | string) {
   return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function ExpenseDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ExpenseDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router  = useRouter();
   const [expense, setExpense]       = useState<any>(null);
   const [occurrences, setOccs]      = useState<any[]>([]);

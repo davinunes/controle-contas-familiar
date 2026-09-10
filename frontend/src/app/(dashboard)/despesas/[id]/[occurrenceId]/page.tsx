@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { occurrencesApi } from "@/lib/api";
 import NfUrlPanel from "@/components/NfUrlPanel";
@@ -14,9 +14,9 @@ function formatBRL(v: number | string) {
 export default function OccurrencePage({
   params,
 }: {
-  params: Promise<{ id: string; occurrenceId: string }>;
+  params: { id: string; occurrenceId: string };
 }) {
-  const { id, occurrenceId } = use(params);
+  const { id, occurrenceId } = params;
   const router  = useRouter();
   const [occ, setOcc]           = useState<any>(null);
   const [loading, setLoading]   = useState(true);
