@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 import { tenantsApi, usersApi, costCentersApi } from "@/lib/api";
-import { getStoredUser, getActiveTenantId } from "@/lib/auth";
+import { getStoredUser, getActiveTenantId, isSuperAdmin, hasAdminAccess } from "@/lib/auth";
 
 type Tab = "tenants" | "cost_centers" | "users" | "account";
 
 export default function ConfigPage() {
-  const [tab, setTab]         = useState<Tab>("tenants");
+  const [tab, setTab]         = useState<Tab>("cost_centers");
   const [tenants, setTenants] = useState<any[]>([]);
   const [users, setUsers]     = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,13 +79,18 @@ export default function ConfigPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [ts, us] = await Promise.all([tenantsApi.list(), usersApi.list()]);
-      setTenants(ts);
-      setUsers(us);
+      const isSuper = isSuperAdmin();
+      const promises: Promise<any>[] = [tenantsApi.list()];
+      if (isSuper) {
+        promises.push(usersApi.list());
+      }
+      const [ts, us] = await Promise.all(promises);
+      setTenants(ts || []);
+      if (us) setUsers(us);
       const activeTid = getActiveTenantId();
-      if (activeTid && ts.some((t: any) => t.id === activeTid)) {
+      if (activeTid && ts?.some((t: any) => t.id === activeTid)) {
         setSelectedTenantForCC(activeTid);
-      } else if (ts.length > 0) {
+      } else if (ts && ts.length > 0) {
         setSelectedTenantForCC(ts[0].id);
       }
     } catch (e: any) {
@@ -165,7 +170,10 @@ export default function ConfigPage() {
     finally { setSavPwd(false); }
   }
 
-  if (!user?.is_superadmin) {
+  const isSuper = isSuperAdmin();
+  const canAccessConfig = hasAdminAccess();
+
+  if (!canAccessConfig) {
     return (
       <div className="container" style={{ paddingTop: 40, textAlign: "center" }}>
         <div style={{ fontSize: "3rem" }}>🔒</div>
@@ -176,9 +184,9 @@ export default function ConfigPage() {
   }
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
-    { key: "tenants",      label: "Tenants",          icon: "🏢" },
     { key: "cost_centers", label: "Centros de Custo", icon: "🏷️" },
-    { key: "users",        label: "Usuários",         icon: "👥" },
+    { key: "tenants",      label: isSuper ? "Tenants" : "Meu Tenant", icon: "🏢" },
+    ...(isSuper ? [{ key: "users" as Tab, label: "Usuários", icon: "👥" }] : []),
     { key: "account",      label: "Minha Conta",      icon: "👤" },
   ];
 
@@ -223,27 +231,29 @@ export default function ConfigPage() {
           {/* ── TENANTS ── */}
           {tab === "tenants" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div className="card">
-                <h3 style={{ marginBottom: "16px" }}>Novo Tenant</h3>
-                <div className="grid-2" style={{ marginBottom: "12px" }}>
-                  <div className="form-group">
-                    <label className="form-label">Nome</label>
-                    <input className="form-input" value={tForm.name}
-                      onChange={e => setTForm(f => ({ ...f, name: e.target.value }))}
-                      placeholder="Ex: Sogros" />
+              {isSuper && (
+                <div className="card">
+                  <h3 style={{ marginBottom: "16px" }}>Novo Tenant</h3>
+                  <div className="grid-2" style={{ marginBottom: "12px" }}>
+                    <div className="form-group">
+                      <label className="form-label">Nome</label>
+                      <input className="form-input" value={tForm.name}
+                        onChange={e => setTForm(f => ({ ...f, name: e.target.value }))}
+                        placeholder="Ex: Sogros" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Slug</label>
+                      <input className="form-input" value={tForm.slug}
+                        onChange={e => setTForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s/g, "-") }))}
+                        placeholder="sogros" />
+                    </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Slug</label>
-                    <input className="form-input" value={tForm.slug}
-                      onChange={e => setTForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/\s/g, "-") }))}
-                      placeholder="sogros" />
-                  </div>
+                  <button className="btn btn-primary" onClick={createTenant}
+                    disabled={!tForm.name || !tForm.slug}>
+                    + Criar Tenant
+                  </button>
                 </div>
-                <button className="btn btn-primary" onClick={createTenant}
-                  disabled={!tForm.name || !tForm.slug}>
-                  + Criar Tenant
-                </button>
-              </div>
+              )}
 
               {tenants.map(t => (
                 <div key={t.id} className="card">
@@ -271,9 +281,11 @@ export default function ConfigPage() {
                       <button className="btn btn-secondary btn-sm" onClick={() => testS3(t.id)}>
                         🧪 Testar
                       </button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteTenant(t.id)}>
-                        🗑️
-                      </button>
+                      {isSuper && (
+                        <button className="btn btn-danger btn-sm" onClick={() => deleteTenant(t.id)}>
+                          🗑️
+                        </button>
+                      )}
                     </div>
                   </div>
                   {t.storage_url ? (
@@ -452,7 +464,7 @@ export default function ConfigPage() {
           )}
 
           {/* ── USERS ── */}
-          {tab === "users" && (
+          {tab === "users" && isSuper && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div className="card">
                 <h3 style={{ marginBottom: "16px" }}>Novo Usuário</h3>

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { isLoggedIn, logout, getStoredUser, getActiveTenantId } from "@/lib/auth";
+import { isLoggedIn, logout, getStoredUser, getActiveTenantId, isTenantAdmin } from "@/lib/auth";
 import TenantSelector from "@/components/TenantSelector";
 
 const NAV = [
@@ -47,14 +47,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {user?.is_superadmin && (
+          {user?.is_superadmin ? (
             <span style={{
               fontSize: "0.7rem", padding: "2px 8px",
               background: "var(--accent-dim)", color: "var(--accent)",
               borderRadius: "var(--radius-full)", border: "1px solid var(--accent-glow)",
               fontWeight: 600,
+            }}>SUPER ADMIN</span>
+          ) : isTenantAdmin(tenantId) ? (
+            <span style={{
+              fontSize: "0.7rem", padding: "2px 8px",
+              background: "rgba(16, 185, 129, 0.15)", color: "var(--success)",
+              borderRadius: "var(--radius-full)", border: "1px solid rgba(16, 185, 129, 0.3)",
+              fontWeight: 600,
             }}>ADMIN</span>
-          )}
+          ) : null}
           <button
             onClick={logout}
             className="btn btn-secondary btn-sm"

@@ -64,3 +64,23 @@ export function logout() {
 export function isLoggedIn(): boolean {
   return !!getAccessToken();
 }
+
+export function isSuperAdmin(): boolean {
+  return !!getStoredUser()?.is_superadmin;
+}
+
+export function isTenantAdmin(tenantId?: number | null): boolean {
+  const user = getStoredUser();
+  if (!user) return false;
+  if (user.is_superadmin) return true;
+  const tid = tenantId ?? getActiveTenantId();
+  if (!tid) return false;
+  return user.tenants?.some(t => t.tenant.id === tid && t.role === "admin") ?? false;
+}
+
+export function hasAdminAccess(): boolean {
+  const user = getStoredUser();
+  if (!user) return false;
+  if (user.is_superadmin) return true;
+  return user.tenants?.some(t => t.role === "admin") ?? false;
+}
