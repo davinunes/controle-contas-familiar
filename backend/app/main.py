@@ -7,7 +7,7 @@ from app.database import engine, SessionLocal
 from app.models import Tenant, User, UserTenant, RefreshToken, Expense, Occurrence, Attachment
 from app.database import Base
 from app.scheduler import start_scheduler, stop_scheduler
-from app.routers import auth, tenants, users, expenses, occurrences, attachments, dashboard
+from app.routers import auth, tenants, cost_centers, users, expenses, occurrences, attachments, dashboard
 
 settings = get_settings()
 
@@ -41,14 +41,19 @@ def seed_admin():
 async def lifespan(app: FastAPI):
     # Startup
     Base.metadata.create_all(bind=engine)
-    # Garante a existência da coluna storage_url caso a tabela já tenha sido criada
+    # Garante a existência de novas colunas caso as tabelas já tenham sido criadas
     from sqlalchemy import text
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE tenants ADD COLUMN storage_url TEXT NULL"))
-            conn.commit()
-    except Exception:
-        pass  # Coluna já existe ou erro ignorado
+    with engine.connect() as conn:
+        for sql in [
+            "ALTER TABLE tenants ADD COLUMN storage_url TEXT NULL",
+            "ALTER TABLE expenses ADD COLUMN cost_center_id INT NULL",
+            "ALTER TABLE expenses ADD COLUMN person_id INT NULL",
+        ]:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # Coluna já existe ou erro ignorado
     seed_admin()
     start_scheduler()
     yield
@@ -74,13 +79,14 @@ app.add_middleware(
 )
 
 # Registra routers
-app.include_router(auth.router,        prefix="/api")
-app.include_router(tenants.router,     prefix="/api")
-app.include_router(users.router,       prefix="/api")
-app.include_router(expenses.router,    prefix="/api")
-app.include_router(occurrences.router, prefix="/api")
-app.include_router(attachments.router, prefix="/api")
-app.include_router(dashboard.router,   prefix="/api")
+app.include_router(auth.router,         prefix="/api")
+app.include_router(tenants.router,      prefix="/api")
+app.include_router(cost_centers.router, prefix="/api")
+app.include_router(users.router,        prefix="/api")
+app.include_router(expenses.router,     prefix="/api")
+app.include_router(occurrences.router,  prefix="/api")
+app.include_router(attachments.router,  prefix="/api")
+app.include_router(dashboard.router,    prefix="/api")
 
 
 @app.get("/api/health")

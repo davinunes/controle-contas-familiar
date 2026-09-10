@@ -32,9 +32,15 @@ class Expense(Base):
     # Detalhes importantes (ex: código concessionária, UC, site)
     important_details  = Column(JSON, nullable=True)  # List[{label: str, value: str}]
 
+    # Centros de Custo (Conceito Duplo)
+    cost_center_id     = Column(Integer, ForeignKey("cost_centers.id", ondelete="SET NULL"), nullable=True, index=True)
+    person_id          = Column(Integer, ForeignKey("cost_centers.id", ondelete="SET NULL"), nullable=True, index=True)
+
     active             = Column(Boolean, default=True)
     created_at         = Column(DateTime, server_default=func.now())
     updated_at         = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     tenant      = relationship("Tenant", back_populates="expenses")
     occurrences = relationship("Occurrence", back_populates="expense", cascade="all, delete-orphan")
+    cost_center = relationship("CostCenter", foreign_keys=[cost_center_id])
+    person      = relationship("CostCenter", foreign_keys=[person_id])

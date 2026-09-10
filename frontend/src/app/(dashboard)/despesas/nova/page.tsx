@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { expensesApi } from "@/lib/api";
+import { expensesApi, costCentersApi } from "@/lib/api";
 import { getActiveTenantId } from "@/lib/auth";
 import QRScanner from "@/components/QRScanner";
 
@@ -14,6 +14,10 @@ export default function NovaDespesaPage() {
   const [type, setType]   = useState<"single"|"installment"|"recurring">("single");
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
+  const [personId, setPersonId] = useState("");
+  const [costCenterId, setCostCenterId] = useState("");
+  const [persons, setPersons] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [recurrenceDay, setRecDay]     = useState("");
   const [totalInst, setTotalInst]      = useState("");
   const [instValue, setInstValue]      = useState("");
@@ -23,6 +27,13 @@ export default function NovaDespesaPage() {
   const [showScanner, setShowScanner]  = useState(false);
   const [saving, setSaving]            = useState(false);
   const [error, setError]              = useState("");
+
+  useEffect(() => {
+    if (tenantId) {
+      costCentersApi.list(tenantId, "person").then(setPersons).catch(() => {});
+      costCentersApi.list(tenantId, "category").then(setCategories).catch(() => {});
+    }
+  }, [tenantId]);
 
   function addDetail()         { setDetails(d => [...d, { label: "", value: "" }]); }
   function removeDetail(i: number) { setDetails(d => d.filter((_, idx) => idx !== i)); }
@@ -40,6 +51,8 @@ export default function NovaDespesaPage() {
         title: title.trim(),
         description: description.trim() || null,
         type,
+        person_id: personId ? parseInt(personId) : null,
+        cost_center_id: costCenterId ? parseInt(costCenterId) : null,
       };
       if (type === "installment") {
         payload.total_installments = parseInt(totalInst);
@@ -126,6 +139,36 @@ export default function NovaDespesaPage() {
             placeholder="Observações adicionais..."
             rows={2}
           />
+        </div>
+
+        {/* Conceito Duplo: Responsável (Pessoa) e Categoria (Centro de Custo) */}
+        <div className="grid-2">
+          <div className="form-group">
+            <label className="form-label">👤 Responsável / Pessoa</label>
+            <select
+              className="form-input"
+              value={personId}
+              onChange={e => setPersonId(e.target.value)}
+            >
+              <option value="">Geral / Compartilhado</option>
+              {persons.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">📁 Centro de Custo / Categoria</label>
+            <select
+              className="form-input"
+              value={costCenterId}
+              onChange={e => setCostCenterId(e.target.value)}
+            >
+              <option value="">Nenhuma Categoria</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Campos condicionais */}

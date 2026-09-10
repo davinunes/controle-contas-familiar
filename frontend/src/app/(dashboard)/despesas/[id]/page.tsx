@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { expensesApi, occurrencesApi } from "@/lib/api";
+import { expensesApi, occurrencesApi, costCentersApi } from "@/lib/api";
 
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -14,6 +14,8 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
   const router  = useRouter();
   const [expense, setExpense]       = useState<any>(null);
   const [occurrences, setOccs]      = useState<any[]>([]);
+  const [persons, setPersons]       = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
   const [editing, setEditing]       = useState(false);
   const [editData, setEditData]     = useState<any>({});
@@ -28,13 +30,17 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
         setEditData({
           title: exp.title,
           description: exp.description || "",
+          person_id: exp.person_id ? String(exp.person_id) : "",
+          cost_center_id: exp.cost_center_id ? String(exp.cost_center_id) : "",
           recurrence_day: exp.recurrence_day || "",
           important_details: exp.important_details || [],
         });
-        // Carrega ocorrências
+        // Carrega ocorrências e centros de custo do tenant
         const { getActiveTenantId } = await import("@/lib/auth");
-        const tid = getActiveTenantId();
+        const tid = exp.tenant_id || getActiveTenantId();
         if (tid) {
+          costCentersApi.list(tid, "person").then(setPersons).catch(() => {});
+          costCentersApi.list(tid, "category").then(setCategories).catch(() => {});
           const occs = await occurrencesApi.list(tid, { expense_id: Number(id) });
           setOccs(occs.sort((a: any, b: any) =>
             new Date(b.reference_month).getTime() - new Date(a.reference_month).getTime()
@@ -96,6 +102,28 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
           }}>
             {expense.type === "single" ? "⚡ Avulsa" : expense.type === "installment" ? "📦 Parcelada" : "🔄 Recorrente"}
           </span>
+          {expense.person && (
+            <span style={{
+              padding: "4px 12px", borderRadius: "var(--radius-full)",
+              background: "rgba(255,255,255,0.06)", border: `1px solid ${expense.person.color || "var(--border)"}`,
+              color: "var(--text-primary)", fontSize: "0.8rem", fontWeight: 600,
+              display: "flex", alignItems: "center", gap: "6px",
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: expense.person.color || "var(--accent)" }} />
+              👤 {expense.person.name}
+            </span>
+          )}
+          {expense.cost_center && (
+            <span style={{
+              padding: "4px 12px", borderRadius: "var(--radius-full)",
+              background: "rgba(255,255,255,0.06)", border: `1px solid ${expense.cost_center.color || "var(--border)"}`,
+              color: "var(--text-primary)", fontSize: "0.8rem", fontWeight: 600,
+              display: "flex", alignItems: "center", gap: "6px",
+            }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: expense.cost_center.color || "var(--accent)" }} />
+              📁 {expense.cost_center.name}
+            </span>
+          )}
           {!expense.active && (
             <span className="badge" style={{ background: "var(--bg-hover)", color: "var(--text-muted)" }}>
               Inativa
@@ -205,6 +233,34 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
                 <label className="form-label">Descrição</label>
                 <textarea className="form-input" value={editData.description}
                   onChange={e => setEditData((d: any) => ({ ...d, description: e.target.value }))} />
+              </div>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">👤 Responsável / Pessoa</label>
+                  <select
+                    className="form-input"
+                    value={editData.person_id || ""}
+                    onChange={e => setEditData((d: any) => ({ ...d, person_id: e.target.value ? Number(e.target.value) : null }))}
+                  >
+                    <option value="">Geral / Compartilhado</option>
+                    {persons.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">📁 Centro de Custo / Categoria</label>
+                  <select
+                    className="form-input"
+                    value={editData.cost_center_id || ""}
+                    onChange={e => setEditData((d: any) => ({ ...d, cost_center_id: e.target.value ? Number(e.target.value) : null }))}
+                  >
+                    <option value="">Nenhuma Categoria</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               {expense.type !== "installment" && (
                 <div className="form-group">

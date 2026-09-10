@@ -5,6 +5,9 @@ from typing import Optional, List, Any
 from decimal import Decimal
 
 
+from app.schemas.cost_center import CostCenterBrief
+
+
 # ── Expense ──────────────────────────────────────────────────
 class ImportantDetail(BaseModel):
     label: str
@@ -15,6 +18,8 @@ class ExpenseCreate(BaseModel):
     title:              str  = Field(..., min_length=2, max_length=200)
     description:        Optional[str] = None
     type:               str  = Field(..., pattern="^(single|installment|recurring)$")
+    cost_center_id:     Optional[int] = None
+    person_id:          Optional[int] = None
     total_installments: Optional[int] = None
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
@@ -25,6 +30,8 @@ class ExpenseCreate(BaseModel):
 class ExpenseUpdate(BaseModel):
     title:              Optional[str] = None
     description:        Optional[str] = None
+    cost_center_id:     Optional[int] = None
+    person_id:          Optional[int] = None
     total_installments: Optional[int] = None
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
@@ -39,6 +46,10 @@ class ExpenseOut(BaseModel):
     title:              str
     description:        Optional[str]
     type:               str
+    cost_center_id:     Optional[int] = None
+    person_id:          Optional[int] = None
+    cost_center:        Optional[CostCenterBrief] = None
+    person:             Optional[CostCenterBrief] = None
     total_installments: Optional[int]
     installment_value:  Optional[Decimal]
     first_due_date:     Optional[date]
@@ -119,13 +130,20 @@ class FiadoData(BaseModel):
 
 
 class ResumoItem(BaseModel):
-    occurrence_id:   int
-    expense_title:   str
-    value:           Decimal
-    due_date:        date
-    status:          str
-    is_overdue:      bool
-    reference_month: date
-    has_boleto:      bool
-    has_danfe:       bool
-    has_comprovante: bool
+    occurrence_id:     int
+    expense_id:        int
+    expense_title:     str
+    value:             Decimal
+    due_date:          date
+    status:            str
+    is_overdue:        bool
+    reference_month:   date
+    has_boleto:        bool
+    has_danfe:         bool
+    has_comprovante:   bool
+    person_id:         Optional[int] = None
+    person_name:       Optional[str] = None
+    person_color:      Optional[str] = None
+    cost_center_id:    Optional[int] = None
+    cost_center_name:  Optional[str] = None
+    cost_center_color: Optional[str] = None

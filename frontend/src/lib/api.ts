@@ -85,6 +85,21 @@ export const usersApi = {
   delete: (id: number)            => request<void>(`/users/${id}`, { method: "DELETE" }),
 };
 
+// Cost Centers (Conceito Duplo: person e category)
+export const costCentersApi = {
+  list: (tenantId: number, type?: "person" | "category", activeOnly = true) => {
+    const q = new URLSearchParams({ tenant_id: String(tenantId), active_only: String(activeOnly) });
+    if (type) q.append("type", type);
+    return request<any[]>(`/cost-centers?${q}`);
+  },
+  create: (tenantId: number, data: any) =>
+    request<any>(`/cost-centers?tenant_id=${tenantId}`, { method: "POST", body: JSON.stringify(data) }),
+  update: (id: number, data: any) =>
+    request<any>(`/cost-centers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    request<void>(`/cost-centers/${id}`, { method: "DELETE" }),
+};
+
 // Expenses
 export const expensesApi = {
   list: (tenantId: number, activeOnly = true) =>
@@ -147,8 +162,11 @@ export const attachmentsApi = {
 export const dashboardApi = {
   resumo: (tenantId: number, month: string) =>
     request<any[]>(`/dashboard/resumo?tenant_id=${tenantId}&month=${month}`),
-  whatsapp: (tenantId: number, month: string) =>
-    request<{ text: string }>(`/dashboard/whatsapp?tenant_id=${tenantId}&month=${month}`),
+  whatsapp: (tenantId: number, month: string, personId?: number | null) => {
+    const q = new URLSearchParams({ tenant_id: String(tenantId), month });
+    if (personId) q.append("person_id", String(personId));
+    return request<{ text: string }>(`/dashboard/whatsapp?${q}`);
+  },
   fiado: (tenantId: number) =>
     request<any>(`/dashboard/fiado?tenant_id=${tenantId}`),
 };

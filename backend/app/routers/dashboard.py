@@ -71,6 +71,7 @@ def get_resumo(
         expense = db.query(Expense).filter(Expense.id == occ.expense_id).first()
         items.append(ResumoItem(
             occurrence_id=occ.id,
+            expense_id=occ.expense_id,
             expense_title=expense.title if expense else "—",
             value=occ.value,
             due_date=occ.due_date,
@@ -80,6 +81,12 @@ def get_resumo(
             has_boleto=_has_attachment(db, occ.id, "boleto"),
             has_danfe=_has_attachment(db, occ.id, "danfe"),
             has_comprovante=_has_attachment(db, occ.id, "comprovante"),
+            person_id=expense.person_id if expense else None,
+            person_name=expense.person.name if expense and expense.person else None,
+            person_color=expense.person.color if expense and expense.person else None,
+            cost_center_id=expense.cost_center_id if expense else None,
+            cost_center_name=expense.cost_center.name if expense and expense.cost_center else None,
+            cost_center_color=expense.cost_center.color if expense and expense.cost_center else None,
         ))
 
     return items
@@ -89,13 +96,11 @@ def get_resumo(
 def get_whatsapp_text(
     tenant_id: int = Query(...),
     month: str = Query(...),
+    person_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Gera texto formatado para copiar no WhatsApp."""
-    from calendar import month_name
-    import locale
-
+    """Gera texto formatado para copiar no WhatsApp (opcionalmente filtrado por responsável)."""
     try:
         ref_month = date.fromisoformat(f"{month}-01")
     except ValueError:
@@ -109,41 +114,56 @@ def get_whatsapp_text(
 
     today = date.today()
 
-    # Vencidas
-    overdue = (
+    def fmt_brl(v: Decimal) -> str:
+        return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    # Filtro base
+    q_overdue = (
         db.query(Occurrence)
+        .join(Expense, Occurrence.expense_id == Expense.id)
         .filter(
             Occurrence.tenant_id == tenant_id,
             Occurrence.status == "pending",
             Occurrence.reference_month < ref_month,
         )
-        .order_by(Occurrence.due_date)
-        .all()
     )
-
-    # Mês atual
-    current = (
+    q_current = (
         db.query(Occurrence)
+        .join(Expense, Occurrence.expense_id == Expense.id)
         .filter(
             Occurrence.tenant_id == tenant_id,
             Occurrence.reference_month == ref_month,
         )
-        .order_by(Occurrence.due_date)
-        .all()
     )
 
-    lines = [f"📊 *Contas – {month_pt}/{ref_month.year}*"]
+    person_label = ""
+    if person_id:
+        from app.models.cost_center import CostCenter
+        person_cc = db.query(CostCenter).filter(CostCenter.id == person_id).first()
+        if person_cc:
+            person_label = f" ({person_cc.name})"
+        q_overdue = q_overdue.filter(Expense.person_id == person_id)
+        q_current = q_current.filter(Expense.person_id == person_id)
+
+    overdue = q_overdue.order_by(Occurrence.due_date).all()
+    current = q_current.order_by(Occurrence.due_date).all()
+
+    lines = [f"📊 *Contas{person_label} – {month_pt}/{ref_month.year}*"]
 
     total_pending = Decimal("0")
+    person_totals: dict[str, Decimal] = {}
 
     if overdue:
         lines.append("\n⚠️ *Vencidas de meses anteriores:*")
         for occ in overdue:
             expense = db.query(Expense).filter(Expense.id == occ.expense_id).first()
             title = expense.title if expense else "—"
+            p_tag = f" [{expense.person.name}]" if (expense and expense.person and not person_id) else ""
             ref_label = occ.reference_month.strftime("%b").capitalize()
-            lines.append(f"  • {title} ({ref_label}) — R$ {occ.value:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            lines.append(f"  • {title}{p_tag} ({ref_label}) — {fmt_brl(occ.value)}")
             total_pending += occ.value
+            p_name = expense.person.name if (expense and expense.person) else "Geral"
+            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + occ.value
 
     if current:
         lines.append(f"\n📋 *{month_pt}/{ref_month.year}:*")
@@ -153,17 +173,28 @@ def get_whatsapp_text(
         for occ in pending_this:
             expense = db.query(Expense).filter(Expense.id == occ.expense_id).first()
             title = expense.title if expense else "—"
+            p_tag = f" [{expense.person.name}]" if (expense and expense.person and not person_id) else ""
             due_label = occ.due_date.strftime("%d/%m")
-            lines.append(f"  • {title} — R$ {occ.value:,.2f} | Vence {due_label}".replace(",", "X").replace(".", ",").replace("X", "."))
+            lines.append(f"  • {title}{p_tag} — {fmt_brl(occ.value)} | Vence {due_label}")
             total_pending += occ.value
+            p_name = expense.person.name if (expense and expense.person) else "Geral"
+            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + occ.value
 
         for occ in paid_this:
             expense = db.query(Expense).filter(Expense.id == occ.expense_id).first()
             title = expense.title if expense else "—"
-            lines.append(f"  • {title} ✅ (pago)")
+            p_tag = f" [{expense.person.name}]" if (expense and expense.person and not person_id) else ""
+            lines.append(f"  ✓ ~{title}{p_tag}~ — {fmt_brl(occ.value)} (Pago)")
 
-    lines.append(f"\n💰 *Total pendente: R$ {total_pending:,.2f}*".replace(",", "X").replace(".", ",").replace("X", "."))
+    lines.append(f"\n💰 *Total Pendente:* {fmt_brl(total_pending)}")
 
+    # Se geral e tiver mais de um responsável, mostra subtotais
+    if not person_id and len(person_totals) > 1:
+        lines.append("\n👥 *Subtotais por Responsável:*")
+        for p_name, p_tot in sorted(person_totals.items()):
+            lines.append(f"  • {p_name}: {fmt_brl(p_tot)}")
+
+    lines.append("\n_Enviado pelo app Organizar_")
     return {"text": "\n".join(lines)}
 
 

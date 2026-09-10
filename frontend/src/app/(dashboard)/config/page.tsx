@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { tenantsApi, usersApi } from "@/lib/api";
-import { getStoredUser } from "@/lib/auth";
+import { tenantsApi, usersApi, costCentersApi } from "@/lib/api";
+import { getStoredUser, getActiveTenantId } from "@/lib/auth";
 
-type Tab = "tenants" | "users" | "account";
+type Tab = "tenants" | "cost_centers" | "users" | "account";
 
 export default function ConfigPage() {
   const [tab, setTab]         = useState<Tab>("tenants");
@@ -19,6 +19,11 @@ export default function ConfigPage() {
   const [tS3, setTS3] = useState({ storage_url: "", s3_endpoint: "", s3_bucket: "", s3_access_key: "", s3_secret_key: "", s3_prefix: "" });
   const [showLegacyS3, setShowLegacyS3] = useState(false);
 
+  // Cost Centers
+  const [selectedTenantForCC, setSelectedTenantForCC] = useState<number | null>(null);
+  const [costCenters, setCostCenters] = useState<any[]>([]);
+  const [ccForm, setCcForm] = useState({ name: "", type: "person" as "person" | "category", color: "#6C63FF" });
+
   // User form
   const [uForm, setUForm] = useState({ name: "", email: "", password: "", is_superadmin: false, active: true, tenant_roles: [] as any[] });
   const [editUser, setEditUser] = useState<any>(null);
@@ -32,12 +37,57 @@ export default function ConfigPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
+  async function loadCostCenters(tid: number) {
+    if (!tid) return;
+    try {
+      const data = await costCentersApi.list(tid, undefined, false);
+      setCostCenters(data);
+    } catch (e: any) {
+      showToast("Erro ao carregar centros de custo: " + e.message, "error");
+    }
+  }
+
+  useEffect(() => {
+    if (selectedTenantForCC) {
+      loadCostCenters(selectedTenantForCC);
+    }
+  }, [selectedTenantForCC]);
+
+  async function createCostCenter() {
+    if (!selectedTenantForCC || !ccForm.name.trim()) return;
+    try {
+      await costCentersApi.create(selectedTenantForCC, ccForm);
+      setCcForm(f => ({ ...f, name: "" }));
+      showToast("Item adicionado!");
+      loadCostCenters(selectedTenantForCC);
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  }
+
+  async function deleteCostCenter(id: number) {
+    if (!selectedTenantForCC || !confirm("Excluir este item?")) return;
+    try {
+      await costCentersApi.delete(id);
+      showToast("Item excluído.");
+      loadCostCenters(selectedTenantForCC);
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  }
+
   async function loadAll() {
     setLoading(true);
     try {
       const [ts, us] = await Promise.all([tenantsApi.list(), usersApi.list()]);
       setTenants(ts);
       setUsers(us);
+      const activeTid = getActiveTenantId();
+      if (activeTid && ts.some((t: any) => t.id === activeTid)) {
+        setSelectedTenantForCC(activeTid);
+      } else if (ts.length > 0) {
+        setSelectedTenantForCC(ts[0].id);
+      }
     } catch (e: any) {
       showToast("Erro ao carregar dados: " + e.message, "error");
     } finally {
@@ -126,9 +176,10 @@ export default function ConfigPage() {
   }
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
-    { key: "tenants", label: "Tenants", icon: "🏢" },
-    { key: "users",   label: "Usuários", icon: "👥" },
-    { key: "account", label: "Minha Conta", icon: "👤" },
+    { key: "tenants",      label: "Tenants",          icon: "🏢" },
+    { key: "cost_centers", label: "Centros de Custo", icon: "🏷️" },
+    { key: "users",        label: "Usuários",         icon: "👥" },
+    { key: "account",      label: "Minha Conta",      icon: "👤" },
   ];
 
   return (
@@ -241,6 +292,162 @@ export default function ConfigPage() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── CENTROS DE CUSTO (CONCEITO DUPLO) ── */}
+          {tab === "cost_centers" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              {/* Seletor de Tenant */}
+              <div className="card" style={{ padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.1rem" }}>🏷️ Centros de Custo & Responsáveis</h3>
+                    <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                      Organize as contas por Pessoa Responsável (ex: Sogro, Sogra) e por Categoria (ex: Farmácia, Mercado).
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Família:</span>
+                    <select
+                      className="form-input"
+                      style={{ padding: "6px 12px", width: "auto" }}
+                      value={selectedTenantForCC || ""}
+                      onChange={e => setSelectedTenantForCC(Number(e.target.value))}
+                    >
+                      {tenants.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Formulário Novo CC */}
+              <div className="card">
+                <h4 style={{ marginBottom: "14px" }}>+ Adicionar Item</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 70px auto", gap: "10px", alignItems: "flex-end" }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Nome</label>
+                    <input
+                      className="form-input"
+                      value={ccForm.name}
+                      onChange={e => setCcForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder={ccForm.type === "person" ? "Ex: Sogro, Sogra, Ambos" : "Ex: Farmácia, Mercado, Luz"}
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Tipo</label>
+                    <select
+                      className="form-input"
+                      value={ccForm.type}
+                      onChange={e => setCcForm(f => ({ ...f, type: e.target.value as any }))}
+                    >
+                      <option value="person">👤 Pessoa</option>
+                      <option value="category">📁 Categoria</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Cor</label>
+                    <input
+                      type="color"
+                      className="form-input"
+                      style={{ padding: "2px", height: "40px", cursor: "pointer" }}
+                      value={ccForm.color}
+                      onChange={e => setCcForm(f => ({ ...f, color: e.target.value }))}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={createCostCenter}
+                    disabled={!ccForm.name.trim() || !selectedTenantForCC}
+                    style={{ height: "40px" }}
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Listas Divididas: Pessoas vs Categorias */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+                {/* Pessoas */}
+                <div className="card">
+                  <h4 style={{ marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>👤 Pessoas / Responsáveis</span>
+                    <span style={{ fontSize: "0.75rem", background: "var(--bg-elevated)", padding: "2px 8px", borderRadius: "10px" }}>
+                      {costCenters.filter(c => c.type === "person").length}
+                    </span>
+                  </h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {costCenters.filter(c => c.type === "person").map(cc => (
+                      <div
+                        key={cc.id}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "8px 12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ width: 12, height: 12, borderRadius: "50%", background: cc.color || "#6C63FF", flexShrink: 0 }} />
+                          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{cc.name}</span>
+                        </div>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: "3px 8px", fontSize: "0.75rem" }}
+                          onClick={() => deleteCostCenter(cc.id)}
+                          title="Excluir"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                    {costCenters.filter(c => c.type === "person").length === 0 && (
+                      <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", margin: "8px 0" }}>
+                        Nenhuma pessoa cadastrada (ex: Sogro, Sogra, Ambos).
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Categorias */}
+                <div className="card">
+                  <h4 style={{ marginBottom: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>📁 Categorias de Gasto</span>
+                    <span style={{ fontSize: "0.75rem", background: "var(--bg-elevated)", padding: "2px 8px", borderRadius: "10px" }}>
+                      {costCenters.filter(c => c.type === "category").length}
+                    </span>
+                  </h4>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {costCenters.filter(c => c.type === "category").map(cc => (
+                      <div
+                        key={cc.id}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "8px 12px", background: "var(--bg-elevated)", borderRadius: "var(--radius-md)"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ width: 12, height: 12, borderRadius: "50%", background: cc.color || "#6C63FF", flexShrink: 0 }} />
+                          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{cc.name}</span>
+                        </div>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          style={{ padding: "3px 8px", fontSize: "0.75rem" }}
+                          onClick={() => deleteCostCenter(cc.id)}
+                          title="Excluir"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                    {costCenters.filter(c => c.type === "category").length === 0 && (
+                      <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", margin: "8px 0" }}>
+                        Nenhuma categoria cadastrada (ex: Farmácia, Mercado, Luz).
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

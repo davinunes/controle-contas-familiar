@@ -20,6 +20,7 @@ class Tenant(Base):
     updated_at    = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     # Relacionamentos
-    expenses    = relationship("Expense", back_populates="tenant", cascade="all, delete-orphan")
-    occurrences = relationship("Occurrence", back_populates="tenant", cascade="all, delete-orphan")
-    user_links  = relationship("UserTenant", back_populates="tenant", cascade="all, delete-orphan")
+    expenses     = relationship("Expense", back_populates="tenant", cascade="all, delete-orphan")
+    occurrences  = relationship("Occurrence", back_populates="tenant", cascade="all, delete-orphan")
+    user_links   = relationship("UserTenant", back_populates="tenant", cascade="all, delete-orphan")
+    cost_centers = relationship("CostCenter", back_populates="tenant", cascade="all, delete-orphan")
