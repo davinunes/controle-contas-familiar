@@ -42,7 +42,11 @@ def get_current_user(
     payload = decode_access_token(credentials.credentials)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido ou expirado")
-    user = db.query(User).filter(User.id == payload.get("sub"), User.active == True).first()
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token com identificador inválido")
+    user = db.query(User).filter(User.id == user_id, User.active == True).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
     return user
@@ -77,7 +81,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
 
-    access_token  = create_access_token({"sub": user.id})
+    access_token  = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token(db, user.id)
 
     return TokenResponse(
@@ -93,7 +97,7 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
 
-    access_token  = create_access_token({"sub": user.id})
+    access_token  = create_access_token({"sub": str(user.id)})
     refresh_token = create_refresh_token(db, user.id)
 
     return TokenResponse(
