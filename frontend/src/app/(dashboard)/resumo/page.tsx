@@ -166,7 +166,8 @@ export default function ResumoPage() {
     setMonth(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`);
   }
 
-  const monthLabel = `${MONTHS_PT[m - 1]} de ${y}`;
+  const [y, m] = month.split("-").map(Number);
+  const monthLabel = `${MONTHS_PT[(m || 1) - 1]} de ${y}`;
   const activePersonObj = availablePersons.find(p => p.id === selectedPerson);
 
   return (
