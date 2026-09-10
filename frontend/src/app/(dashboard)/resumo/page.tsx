@@ -2,9 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { dashboardApi, occurrencesApi } from "@/lib/api";
+import { dashboardApi, occurrencesApi, expensesApi } from "@/lib/api";
 import { getActiveTenantId } from "@/lib/auth";
 import ArtifactStatusBadges from "@/components/ArtifactStatusBadges";
+import QRScanner from "@/components/QRScanner";
 
 const MONTHS_PT = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -34,6 +35,8 @@ export default function ResumoPage() {
   const [copying, setCopying]                   = useState(false);
   const [toast, setToast]                       = useState<{ msg: string; type: "success"|"error" } | null>(null);
   const [marking, setMarking]                   = useState<number | null>(null);
+  const [showQrScanner, setShowQrScanner]       = useState(false);
+  const [qrProcessing, setQrProcessing]         = useState(false);
 
   const tenantId = getActiveTenantId();
 
@@ -85,6 +88,21 @@ export default function ResumoPage() {
     }
   }
 
+  async function handleQuickQr(qrUrl: string) {
+    if (!tenantId) return;
+    setShowQrScanner(false);
+    setQrProcessing(true);
+    try {
+      const res = await expensesApi.quickQr(tenantId, qrUrl);
+      showToast("Nota Fiscal capturada! Redirecionando... ⚡");
+      router.push(`/despesas/${res.expense_id}/${res.occurrence_id}`);
+    } catch (err: any) {
+      alert(err.message || "Erro ao processar QR Code.");
+    } finally {
+      setQrProcessing(false);
+    }
+  }
+
   // Lista de pessoas disponíveis nos itens
   const availablePersons = Array.from(
     new Map(
@@ -110,6 +128,9 @@ export default function ResumoPage() {
     const ref = new Date(i.reference_month);
     return ref >= refDate;
   });
+
+  const currentPending = current.filter(i => i.status === "pending");
+  const currentPaid    = current.filter(i => i.status === "paid");
 
   const totalPending = displayedItems
     .filter(i => i.status === "pending")
@@ -144,6 +165,13 @@ export default function ResumoPage() {
 
   return (
     <div className="container" style={{ paddingTop: "16px", paddingBottom: "32px" }}>
+      {showQrScanner && (
+        <QRScanner
+          onDetect={handleQuickQr}
+          onClose={() => setShowQrScanner(false)}
+        />
+      )}
+
       {/* Navegação de Mês */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -244,6 +272,31 @@ export default function ResumoPage() {
         </div>
       )}
 
+      {/* Barra de Ações Rápidas */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+        <button
+          className="btn btn-secondary"
+          onClick={() => setShowQrScanner(true)}
+          disabled={qrProcessing || loading}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            fontWeight: 600, padding: "10px",
+          }}
+        >
+          📷 {qrProcessing ? "Processando..." : "Ler QR Code"}
+        </button>
+        <Link
+          href="/despesas/nova"
+          className="btn btn-primary"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            fontWeight: 600, textDecoration: "none", padding: "10px",
+          }}
+        >
+          + Nova Despesa
+        </Link>
+      </div>
+
       {/* Botão WhatsApp */}
       <button
         className="btn btn-full"
@@ -283,7 +336,7 @@ export default function ResumoPage() {
                 color: "var(--danger)", marginBottom: "12px", fontSize: "0.9rem",
                 textTransform: "uppercase", letterSpacing: "0.08em",
               }}>
-                ⚠️ Vencidas de meses anteriores
+                ⚠️ Vencidas de meses anteriores ({overdue.length})
               </h3>
               {overdue.map(item => (
                 <ExpenseCard
@@ -297,16 +350,39 @@ export default function ResumoPage() {
             </section>
           )}
 
-          {/* Mês atual */}
-          {current.length > 0 && (
-            <section>
+          {/* Mês atual - Contas a Pagar / Pendentes */}
+          {currentPending.length > 0 && (
+            <section style={{ marginBottom: "24px" }}>
               <h3 style={{
-                color: "var(--text-muted)", marginBottom: "12px", fontSize: "0.9rem",
+                color: "var(--accent-light)", marginBottom: "12px", fontSize: "0.9rem",
                 textTransform: "uppercase", letterSpacing: "0.08em",
+                display: "flex", alignItems: "center", gap: "8px",
               }}>
-                📋 {monthLabel}
+                ⏳ Contas a Pagar em {monthLabel} ({currentPending.length})
               </h3>
-              {current.map(item => (
+              {currentPending.map(item => (
+                <ExpenseCard
+                  key={item.occurrence_id}
+                  item={item}
+                  overdue={false}
+                  marking={marking}
+                  onPay={handleMarkPaid}
+                />
+              ))}
+            </section>
+          )}
+
+          {/* Mês atual - Contas Pagas (abaixo das pendentes, nunca ocultas) */}
+          {currentPaid.length > 0 && (
+            <section style={{ marginBottom: "24px" }}>
+              <h3 style={{
+                color: "var(--success)", marginBottom: "12px", fontSize: "0.9rem",
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                display: "flex", alignItems: "center", gap: "8px",
+              }}>
+                ✅ Contas Pagas ({currentPaid.length})
+              </h3>
+              {currentPaid.map(item => (
                 <ExpenseCard
                   key={item.occurrence_id}
                   item={item}

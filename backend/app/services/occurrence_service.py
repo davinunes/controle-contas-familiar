@@ -45,13 +45,21 @@ def generate_occurrences_for_month(db: Session, year: int, month: int) -> int:
             continue
 
         if expense.type == ExpenseType.recurring:
-            # Recorrente: gera 1 ocorrência com valor 0 (a ser preenchido)
+            period = getattr(expense, "recurrence_period", "monthly") or "monthly"
+            if period == "yearly":
+                rec_month = getattr(expense, "recurrence_month", None)
+                # Se for anual e tiver mês configurado, só gera se for o mês correto
+                if rec_month and rec_month != month:
+                    continue
+
+            # Recorrente: usa o valor inicial/fixo cadastrado ou 0
             day = expense.recurrence_day or 1
+            init_val = expense.recurring_value or 0
             occ = Occurrence(
                 expense_id=expense.id,
                 tenant_id=expense.tenant_id,
                 reference_month=reference_month,
-                value=0,
+                value=init_val,
                 due_date=_due_date_for_month(day, year, month),
             )
             db.add(occ)

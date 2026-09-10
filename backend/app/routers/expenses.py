@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from datetime import date
+from sqlalchemy.orm import Session, joinedload
+from datetime import date, datetime
 
 from app.database import get_db
 from app.models.expense import Expense
 from app.models.user import User, UserTenant
 from app.models.occurrence import Occurrence
 from app.routers.auth import get_current_user
-from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseOut
+from app.schemas.expense import ExpenseCreate, ExpenseUpdate, ExpenseOut, QuickQrCreate
 from app.services.occurrence_service import generate_occurrences_for_month
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -79,22 +79,31 @@ def create_expense(
         db.add(occ)
         db.commit()
 
-    # Para recorrentes: gera 1 ocorrência no mês atual imediatamente
+    # Para recorrentes: gera ocorrência se for mensal ou se for o mês anual correspondente
     elif expense.type == "recurring":
         today = date.today()
-        ref_month = date(today.year, today.month, 1)
-        from calendar import monthrange
-        day = expense.recurrence_day or 1
-        last_day = monthrange(today.year, today.month)[1]
-        occ = Occurrence(
-            expense_id=expense.id,
-            tenant_id=tenant_id,
-            reference_month=ref_month,
-            value=0,
-            due_date=date(today.year, today.month, min(day, last_day)),
-        )
-        db.add(occ)
-        db.commit()
+        period = getattr(expense, "recurrence_period", "monthly") or "monthly"
+        rec_month = getattr(expense, "recurrence_month", None)
+
+        should_generate = True
+        if period == "yearly" and rec_month and rec_month != today.month:
+            should_generate = False
+
+        if should_generate:
+            ref_month = date(today.year, today.month, 1)
+            from calendar import monthrange
+            day = expense.recurrence_day or 1
+            last_day = monthrange(today.year, today.month)[1]
+            init_val = expense.recurring_value or 0
+            occ = Occurrence(
+                expense_id=expense.id,
+                tenant_id=tenant_id,
+                reference_month=ref_month,
+                value=init_val,
+                due_date=date(today.year, today.month, min(day, last_day)),
+            )
+            db.add(occ)
+            db.commit()
 
     return expense
 
@@ -183,3 +192,71 @@ def delete_expense(
     _check_tenant_access(db, current_user, expense.tenant_id)
     db.delete(expense)
     db.commit()
+
+
+@router.post("/quick-qr", response_model=dict, status_code=status.HTTP_201_CREATED)
+def create_expense_from_quick_qr(
+    payload: QuickQrCreate,
+    tenant_id: int = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _check_tenant_access(db, current_user, tenant_id)
+    qr_url = payload.qr_url.strip()
+
+    # Proteção contra duplicidade de QR Code no tenant
+    existing_occ = (
+        db.query(Occurrence)
+        .options(joinedload(Occurrence.expense))
+        .filter(
+            Occurrence.tenant_id == tenant_id,
+            Occurrence.nf_url == qr_url,
+        )
+        .first()
+    )
+    if existing_occ:
+        expense_title = existing_occ.expense.title if existing_occ.expense else "Despesa existente"
+        due_str = existing_occ.due_date.strftime("%d/%m/%Y")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": f"Este QR Code já foi cadastrado anteriormente na despesa '{expense_title}' (Vencimento: {due_str}).",
+                "expense_id": existing_occ.expense_id,
+                "occurrence_id": existing_occ.id,
+            }
+        )
+
+    # Criação imediata da despesa avulsa genérica
+    now = datetime.now()
+    title = f"Nota Fiscal - {now.strftime('%d/%m/%Y %H:%M')}"
+    expense = Expense(
+        tenant_id=tenant_id,
+        title=title,
+        type="single",
+        recurrence_day=now.day,
+        active=True,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+
+    ref_month = date(now.year, now.month, 1)
+    occ = Occurrence(
+        expense_id=expense.id,
+        tenant_id=tenant_id,
+        reference_month=ref_month,
+        value=0,
+        due_date=date(now.year, now.month, now.day),
+        nf_url=qr_url,
+        status="pending",
+    )
+    db.add(occ)
+    db.commit()
+    db.refresh(occ)
+
+    return {
+        "message": "Despesa criada com sucesso a partir do QR Code",
+        "expense_id": expense.id,
+        "occurrence_id": occ.id,
+        "title": expense.title,
+    }

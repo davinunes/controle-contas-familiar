@@ -118,6 +118,11 @@ export const expensesApi = {
     request<any>(`/expenses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<void>(`/expenses/${id}`, { method: "DELETE" }),
+  quickQr: (tenantId: number, qrUrl: string) =>
+    request<any>(`/expenses/quick-qr?tenant_id=${tenantId}`, {
+      method: "POST",
+      body: JSON.stringify({ qr_url: qrUrl }),
+    }),
 };
 
 // Occurrences

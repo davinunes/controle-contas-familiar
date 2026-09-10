@@ -28,6 +28,9 @@ class Expense(Base):
 
     # Recorrentes e avulsas
     recurrence_day     = Column(Integer, nullable=True)
+    recurring_value    = Column(Numeric(10, 2), nullable=True)
+    recurrence_period  = Column(String(20), nullable=False, default="monthly")  # 'monthly' | 'yearly'
+    recurrence_month   = Column(Integer, nullable=True)  # 1 a 12 (se yearly)
 
     # Detalhes importantes (ex: código concessionária, UC, site)
     important_details  = Column(JSON, nullable=True)  # List[{label: str, value: str}]

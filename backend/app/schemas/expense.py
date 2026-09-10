@@ -14,6 +14,10 @@ class ImportantDetail(BaseModel):
     value: str
 
 
+class QuickQrCreate(BaseModel):
+    qr_url: str = Field(..., min_length=5)
+
+
 class ExpenseCreate(BaseModel):
     title:              str  = Field(..., min_length=2, max_length=200)
     description:        Optional[str] = None
@@ -24,10 +28,13 @@ class ExpenseCreate(BaseModel):
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = Field(None, ge=1, le=31)
+    recurring_value:    Optional[Decimal] = None
+    recurrence_period:  Optional[str] = Field("monthly", pattern="^(monthly|yearly)$")
+    recurrence_month:   Optional[int] = Field(None, ge=1, le=12)
     important_details:  Optional[List[ImportantDetail]] = None
 
 
-    @field_validator("cost_center_id", "person_id", "recurrence_day", mode="before")
+    @field_validator("cost_center_id", "person_id", "recurrence_day", "recurring_value", "recurrence_month", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -44,10 +51,13 @@ class ExpenseUpdate(BaseModel):
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = Field(None, ge=1, le=31)
+    recurring_value:    Optional[Decimal] = None
+    recurrence_period:  Optional[str] = Field(None, pattern="^(monthly|yearly)$")
+    recurrence_month:   Optional[int] = Field(None, ge=1, le=12)
     important_details:  Optional[List[ImportantDetail]] = None
     active:             Optional[bool] = None
 
-    @field_validator("cost_center_id", "person_id", "recurrence_day", mode="before")
+    @field_validator("cost_center_id", "person_id", "recurrence_day", "recurring_value", "recurrence_month", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -69,6 +79,9 @@ class ExpenseOut(BaseModel):
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = None
+    recurring_value:    Optional[Decimal] = None
+    recurrence_period:  Optional[str] = "monthly"
+    recurrence_month:   Optional[int] = None
     important_details:  Optional[List[Any]] = None
     active:             bool = True
     created_at:         datetime

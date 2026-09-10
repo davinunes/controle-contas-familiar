@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { expensesApi } from "@/lib/api";
 import { getActiveTenantId } from "@/lib/auth";
+import QRScanner from "@/components/QRScanner";
 
 const TYPE_LABELS: Record<string, string> = {
   single:      "⚡ Avulsa",
@@ -17,6 +18,8 @@ export default function DespesasPage() {
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [qrProcessing, setQrProcessing]   = useState(false);
 
   const tenantId = getActiveTenantId();
 
@@ -43,13 +46,43 @@ export default function DespesasPage() {
     load();
   }
 
+  async function handleQuickQr(qrUrl: string) {
+    if (!tenantId) return;
+    setShowQrScanner(false);
+    setQrProcessing(true);
+    try {
+      const res = await expensesApi.quickQr(tenantId, qrUrl);
+      router.push(`/despesas/${res.expense_id}/${res.occurrence_id}`);
+    } catch (err: any) {
+      alert(err.message || "Erro ao processar QR Code.");
+    } finally {
+      setQrProcessing(false);
+    }
+  }
+
   return (
     <div className="container" style={{ paddingTop: "20px" }}>
+      {showQrScanner && (
+        <QRScanner
+          onDetect={handleQuickQr}
+          onClose={() => setShowQrScanner(false)}
+        />
+      )}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
         <h1 style={{ fontSize: "1.4rem" }}>Despesas</h1>
-        <Link href="/despesas/nova" className="btn btn-primary btn-sm">
-          + Nova
-        </Link>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowQrScanner(true)}
+            disabled={qrProcessing || loading}
+          >
+            📷 {qrProcessing ? "..." : "Ler QR Code"}
+          </button>
+          <Link href="/despesas/nova" className="btn btn-primary btn-sm">
+            + Nova
+          </Link>
+        </div>
       </div>
 
       {/* Busca */}

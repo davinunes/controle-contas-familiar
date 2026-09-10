@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE tenants ADD COLUMN storage_url TEXT NULL",
             "ALTER TABLE expenses ADD COLUMN cost_center_id INT NULL",
             "ALTER TABLE expenses ADD COLUMN person_id INT NULL",
+            "ALTER TABLE expenses ADD COLUMN recurring_value NUMERIC(10, 2) NULL",
+            "ALTER TABLE expenses ADD COLUMN recurrence_period VARCHAR(20) DEFAULT 'monthly'",
+            "ALTER TABLE expenses ADD COLUMN recurrence_month INT NULL",
         ]:
             try:
                 conn.execute(text(sql))

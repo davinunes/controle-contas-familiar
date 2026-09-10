@@ -18,7 +18,10 @@ export default function NovaDespesaPage() {
   const [costCenterId, setCostCenterId] = useState("");
   const [persons, setPersons] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
-  const [recurrenceDay, setRecDay]     = useState("");
+  const [recurrenceDay, setRecDay]             = useState("");
+  const [recurringValue, setRecurringValue]     = useState("");
+  const [recurrencePeriod, setRecurrencePeriod] = useState<"monthly"|"yearly">("monthly");
+  const [recurrenceMonth, setRecurrenceMonth]   = useState("1");
   const [totalInst, setTotalInst]      = useState("");
   const [instValue, setInstValue]      = useState("");
   const [firstDue, setFirstDue]        = useState("");
@@ -61,6 +64,13 @@ export default function NovaDespesaPage() {
       }
       if (type === "recurring") {
         payload.recurrence_day    = parseInt(recurrenceDay) || 1;
+        payload.recurrence_period = recurrencePeriod;
+        if (recurrencePeriod === "yearly") {
+          payload.recurrence_month = parseInt(recurrenceMonth) || 1;
+        }
+        if (recurringValue.trim()) {
+          payload.recurring_value = parseFloat(recurringValue);
+        }
         payload.important_details = details.filter(d => d.label && d.value);
       }
       if (type === "single") {
@@ -215,13 +225,72 @@ export default function NovaDespesaPage() {
 
         {type === "recurring" && (
           <>
+            {/* Periodicidade */}
             <div className="form-group">
-              <label className="form-label">Dia de Vencimento Mensal *</label>
-              <input
-                type="number" className="form-input" min={1} max={31} required
-                value={recurrenceDay} onChange={e => setRecDay(e.target.value)}
-                placeholder="Ex: 15"
-              />
+              <label className="form-label">Periodicidade da Recorrência</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setRecurrencePeriod("monthly")}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: `2px solid ${recurrencePeriod === "monthly" ? "var(--accent)" : "var(--border)"}`,
+                    background: recurrencePeriod === "monthly" ? "var(--accent-dim)" : "var(--bg-elevated)",
+                    color: recurrencePeriod === "monthly" ? "var(--accent-light)" : "var(--text-secondary)",
+                    fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+                  }}
+                >
+                  🔄 Mensal (Todo mês)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecurrencePeriod("yearly")}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: `2px solid ${recurrencePeriod === "yearly" ? "var(--accent)" : "var(--border)"}`,
+                    background: recurrencePeriod === "yearly" ? "var(--accent-dim)" : "var(--bg-elevated)",
+                    color: recurrencePeriod === "yearly" ? "var(--accent-light)" : "var(--text-secondary)",
+                    fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+                  }}
+                >
+                  📅 Anual (1x por ano)
+                </button>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              {recurrencePeriod === "yearly" && (
+                <div className="form-group">
+                  <label className="form-label">Mês de Vencimento *</label>
+                  <select
+                    className="form-input"
+                    value={recurrenceMonth}
+                    onChange={e => setRecurrenceMonth(e.target.value)}
+                  >
+                    {["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((m, idx) => (
+                      <option key={idx + 1} value={idx + 1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Dia de Vencimento *</label>
+                <input
+                  type="number" className="form-input" min={1} max={31} required
+                  value={recurrenceDay} onChange={e => setRecDay(e.target.value)}
+                  placeholder="Ex: 15"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Valor Inicial / Fixo (R$)</label>
+                <input
+                  type="number" step="0.01" min="0" className="form-input"
+                  value={recurringValue} onChange={e => setRecurringValue(e.target.value)}
+                  placeholder="Ex: 150.00 (opcional)"
+                />
+              </div>
             </div>
 
             {/* Detalhes Importantes */}
