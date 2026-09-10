@@ -22,8 +22,16 @@ function formatBRL(v: number | string) {
 }
 
 function formatDate(d: string) {
+  if (!d) return "";
   const [y, m, day] = d.split("-");
   return `${day}/${m}/${y}`;
+}
+
+function formatMonthYear(d: string) {
+  if (!d) return "";
+  const [y, m] = d.split("-");
+  const monthIdx = parseInt(m, 10) - 1;
+  return `${MONTHS_PT[monthIdx]?.slice(0, 3)}/${y}`;
 }
 
 export default function ResumoPage() {
@@ -117,16 +125,14 @@ export default function ResumoPage() {
     ? items
     : items.filter(i => i.person_id === selectedPerson);
 
-  // Separa vencidas vs. do mês
-  const [y, m] = month.split("-").map(Number);
-  const refDate = new Date(y, m - 1, 1);
+  // Separa vencidas vs. do mês (comparação direta YYYY-MM imune a fuso horário)
   const overdue = displayedItems.filter(i => {
-    const ref = new Date(i.reference_month);
-    return ref < refDate && i.status === "pending";
+    const itemMonth = (i.reference_month || "").slice(0, 7);
+    return itemMonth < month && i.status === "pending";
   });
   const current = displayedItems.filter(i => {
-    const ref = new Date(i.reference_month);
-    return ref >= refDate;
+    const itemMonth = (i.reference_month || "").slice(0, 7);
+    return itemMonth >= month;
   });
 
   const currentPending = current.filter(i => i.status === "pending");
@@ -485,7 +491,7 @@ function ExpenseCard({
                 background: "var(--danger-dim)", color: "var(--danger)",
                 borderRadius: "var(--radius-full)", fontWeight: 600,
               }}>
-                {new Date(item.reference_month).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
+                {formatMonthYear(item.reference_month)}
               </span>
             )}
 
