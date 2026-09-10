@@ -59,18 +59,18 @@ class ExpenseOut(BaseModel):
     id:                 int
     tenant_id:          int
     title:              str
-    description:        Optional[str]
+    description:        Optional[str] = None
     type:               str
     cost_center_id:     Optional[int] = None
     person_id:          Optional[int] = None
     cost_center:        Optional[CostCenterBrief] = None
     person:             Optional[CostCenterBrief] = None
-    total_installments: Optional[int]
-    installment_value:  Optional[Decimal]
-    first_due_date:     Optional[date]
-    recurrence_day:     Optional[int]
-    important_details:  Optional[List[Any]]
-    active:             bool
+    total_installments: Optional[int] = None
+    installment_value:  Optional[Decimal] = None
+    first_due_date:     Optional[date] = None
+    recurrence_day:     Optional[int] = None
+    important_details:  Optional[List[Any]] = None
+    active:             bool = True
     created_at:         datetime
     updated_at:         datetime
 
@@ -101,7 +101,7 @@ class AttachmentBrief(BaseModel):
     id:                int
     type:              str
     original_filename: str
-    s3_url:            Optional[str]
+    s3_url:            Optional[str] = None
     uploaded_at:       datetime
 
     model_config = {"from_attributes": True}
@@ -112,15 +112,15 @@ class OccurrenceOut(BaseModel):
     expense_id:         int
     tenant_id:          int
     reference_month:    date
-    installment_number: Optional[int]
+    installment_number: Optional[int] = None
     value:              Decimal
     due_date:           date
-    nf_url:             Optional[str]
+    nf_url:             Optional[str] = None
     status:             str
-    paid_at:            Optional[datetime]
-    notes:              Optional[str]
+    paid_at:            Optional[datetime] = None
+    notes:              Optional[str] = None
     attachments:        List[AttachmentBrief] = []
-    expense:            Optional[Any] = None
+    expense:            Optional[ExpenseOut] = None
     created_at:         datetime
     updated_at:         datetime
 

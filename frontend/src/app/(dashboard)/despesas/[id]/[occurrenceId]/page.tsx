@@ -194,6 +194,25 @@ export default function OccurrencePage({
         </div>
       </div>
 
+      {/* Detalhes importantes da despesa (ex: código do cliente, UC) */}
+      {occ.expense?.important_details?.length > 0 && (
+        <div className="card" style={{ marginBottom: "20px" }}>
+          <h4 style={{ marginBottom: "8px", fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            📌 Dados da Conta / Concessionária
+          </h4>
+          {occ.expense.important_details.map((d: any, i: number) => (
+            <div key={i} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "6px 0",
+              borderBottom: i < occ.expense.important_details.length - 1 ? "1px solid var(--border)" : "none",
+            }}>
+              <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>{d.label}</span>
+              <span style={{ fontSize: "0.85rem", fontWeight: 600, fontFamily: "monospace" }}>{d.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Artefatos */}
       <h3 style={{ marginBottom: "12px", fontSize: "0.85rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
         Artefatos

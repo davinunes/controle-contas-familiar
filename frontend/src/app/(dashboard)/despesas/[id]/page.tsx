@@ -52,14 +52,41 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
     })();
   }, [id]);
 
+  function addDetail() {
+    setEditData((d: any) => ({
+      ...d,
+      important_details: [...(d.important_details || []), { label: "", value: "" }],
+    }));
+  }
+
+  function updateDetail(index: number, field: "label" | "value", val: string) {
+    setEditData((d: any) => {
+      const copy = [...(d.important_details || [])];
+      copy[index] = { ...copy[index], [field]: val };
+      return { ...d, important_details: copy };
+    });
+  }
+
+  function removeDetail(index: number) {
+    setEditData((d: any) => ({
+      ...d,
+      important_details: (d.important_details || []).filter((_: any, i: number) => i !== index),
+    }));
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
+      const filteredDetails = (editData.important_details || [])
+        .filter((d: any) => d.label?.trim() && d.value?.trim())
+        .map((d: any) => ({ label: d.label.trim(), value: d.value.trim() }));
+
       const payload: any = {
         title: editData.title?.trim(),
         description: editData.description?.trim() || null,
         person_id: editData.person_id ? Number(editData.person_id) : null,
         cost_center_id: editData.cost_center_id ? Number(editData.cost_center_id) : null,
+        important_details: filteredDetails,
       };
       if (editData.recurrence_day !== "" && editData.recurrence_day != null) {
         payload.recurrence_day = Number(editData.recurrence_day);
@@ -178,21 +205,30 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
       </div>
 
       {/* Detalhes importantes */}
-      {expense.important_details?.length > 0 && (
-        <div className="card" style={{ marginBottom: "24px" }}>
-          <h3 style={{ marginBottom: "12px", fontSize: "0.9rem" }}>📌 Detalhes Importantes</h3>
-          {expense.important_details.map((d: any, i: number) => (
+      <div className="card" style={{ marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+          <h3 style={{ margin: 0, fontSize: "0.95rem" }}>📌 Detalhes Importantes</h3>
+          <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
+            ✏️ Editar Detalhes
+          </button>
+        </div>
+        {expense.important_details?.length > 0 ? (
+          expense.important_details.map((d: any, i: number) => (
             <div key={i} style={{
-              display: "flex", justifyContent: "space-between",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
               padding: "8px 0",
               borderBottom: i < expense.important_details.length - 1 ? "1px solid var(--border)" : "none",
             }}>
               <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>{d.label}</span>
               <span style={{ fontSize: "0.85rem", fontWeight: 600, fontFamily: "monospace" }}>{d.value}</span>
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontStyle: "italic" }}>
+            Nenhum código ou detalhe adicional cadastrado (ex: Código do cliente, UC, link, etc).
+          </div>
+        )}
+      </div>
 
       {/* Ocorrências */}
       <h2 style={{ fontSize: "1rem", marginBottom: "12px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -291,6 +327,50 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                     onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
                 </div>
               )}
+
+              {/* Detalhes Importantes */}
+              <div className="form-group">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <label className="form-label" style={{ margin: 0 }}>
+                    📌 Detalhes Importantes
+                  </label>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={addDetail}>
+                    + Adicionar
+                  </button>
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "8px" }}>
+                  Ex: Código do cliente, Unidade Consumidora, link para 2ª via, etc.
+                </p>
+                {(editData.important_details || []).map((d: any, i: number) => (
+                  <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                    <input
+                      className="form-input" placeholder="Rótulo (ex: Código)"
+                      style={{ flex: 1 }}
+                      value={d.label} onChange={e => updateDetail(i, "label", e.target.value)}
+                    />
+                    <input
+                      className="form-input" placeholder="Valor"
+                      style={{ flex: 1 }}
+                      value={d.value} onChange={e => updateDetail(i, "value", e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      style={{ padding: "0 10px" }}
+                      onClick={() => removeDetail(i)}
+                    >✕</button>
+                  </div>
+                ))}
+                {(!editData.important_details || editData.important_details.length === 0) && (
+                  <div style={{
+                    border: "1px dashed var(--border)", borderRadius: "var(--radius-md)",
+                    padding: "12px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem",
+                  }}>
+                    Nenhum detalhe adicionado
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>
                   {saving ? "Salvando..." : "Salvar"}

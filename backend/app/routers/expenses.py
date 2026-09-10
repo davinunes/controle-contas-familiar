@@ -155,11 +155,14 @@ def update_expense(
     _check_tenant_access(db, current_user, expense.tenant_id)
 
     data = payload.model_dump(exclude_none=True)
-    if "important_details" in data and data["important_details"]:
-        data["important_details"] = [
-            d.model_dump() if hasattr(d, "model_dump") else d
-            for d in data["important_details"]
-        ]
+    if "important_details" in data:
+        if data["important_details"]:
+            data["important_details"] = [
+                d.model_dump() if hasattr(d, "model_dump") else (d if isinstance(d, dict) else {"label": getattr(d, "label", ""), "value": getattr(d, "value", "")})
+                for d in data["important_details"]
+            ]
+        else:
+            data["important_details"] = []
 
     for field, value in data.items():
         setattr(expense, field, value)
