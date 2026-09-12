@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import date
+from app.timezone import sp_today
 from decimal import Decimal
 from typing import Optional
 
@@ -44,7 +45,7 @@ def get_resumo(
         raise HTTPException(status_code=400, detail="Formato inválido. Use YYYY-MM")
 
     # Só gera automaticamente se for mês atual ou futuro (trava para meses passados)
-    today = date.today()
+    today = sp_today()
     current_first_day = date(today.year, today.month, 1)
     if ref_month >= current_first_day:
         try:
@@ -75,7 +76,7 @@ def get_resumo(
         .all()
     )
 
-    today = date.today()
+    today = sp_today()
     items = []
 
     for occ in overdue_occs + current_occs:
@@ -123,7 +124,7 @@ def get_whatsapp_text(
         "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
     ][ref_month.month - 1]
 
-    today = date.today()
+    today = sp_today()
 
     def fmt_brl(v: Decimal) -> str:
         return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -216,7 +217,7 @@ def get_fiado(
     db: Session = Depends(get_db),
 ):
     """Calcula o total de débito acumulado vs reembolsado."""
-    today = date.today()
+    today = sp_today()
 
     # Total pendente (todos os meses, até hoje)
     total_pending = db.query(func.sum(Occurrence.value)).filter(

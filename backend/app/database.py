@@ -11,6 +11,7 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     echo=settings.debug,
+    connect_args={"init_command": "SET time_zone = '-03:00'"},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from app.timezone import sp_today
 from calendar import monthrange
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -91,7 +92,7 @@ def generate_occurrences_for_month(db: Session, year: int, month: int, tenant_id
 
 def get_pending_overdue(db: Session, tenant_id: int) -> list[Occurrence]:
     """Retorna ocorrências pendentes com due_date anterior ao mês atual."""
-    today = date.today()
+    today = sp_today()
     current_month = _first_of_month(today.year, today.month)
     return (
         db.query(Occurrence)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime
+from app.timezone import sp_now, sp_today
 
 from app.database import get_db
 from app.models.expense import Expense
@@ -59,12 +60,12 @@ def create_expense(
 
     # Para parceladas: gera todas as ocorrências imediatamente
     if expense.type == "installment" and expense.first_due_date:
-        today = date.today()
+        today = sp_today()
         _generate_installment_occurrences(db, expense)
 
     # Para avulsas: gera 1 ocorrência no mês atual
     elif expense.type == "single":
-        today = date.today()
+        today = sp_today()
         ref_month = date(today.year, today.month, 1)
         from calendar import monthrange
         day = expense.recurrence_day or today.day
@@ -81,7 +82,7 @@ def create_expense(
 
     # Para recorrentes: gera ocorrência se for mensal ou se for o mês anual correspondente
     elif expense.type == "recurring":
-        today = date.today()
+        today = sp_today()
         period = getattr(expense, "recurrence_period", "monthly") or "monthly"
         rec_month = getattr(expense, "recurrence_month", None)
 
@@ -227,7 +228,7 @@ def create_expense_from_quick_qr(
         )
 
     # Criação imediata da despesa avulsa genérica
-    now = datetime.now()
+    now = sp_now()
     title = f"Nota Fiscal - {now.strftime('%d/%m/%Y %H:%M')}"
     expense = Expense(
         tenant_id=tenant_id,
@@ -246,7 +247,7 @@ def create_expense_from_quick_qr(
         tenant_id=tenant_id,
         reference_month=ref_month,
         value=0,
-        due_date=date(now.year, now.month, now.day),
+        due_date=now.date(),
         nf_url=qr_url,
         status="pending",
     )

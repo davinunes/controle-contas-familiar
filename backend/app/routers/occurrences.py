@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timezone
+from app.timezone import sp_now_naive, sp_today
 from typing import Optional
 
 from app.database import get_db
@@ -65,7 +66,7 @@ def list_overdue(
 ):
     """Retorna ocorrências pendentes de meses anteriores."""
     _check_access(db, current_user, tenant_id)
-    today = date.today()
+    today = sp_today()
     current_month = date(today.year, today.month, 1)
 
     return (
@@ -137,7 +138,7 @@ def update_occurrence(
 
     # Se marcando como pago e não forneceu paid_at
     if data.get("status") == "paid" and "paid_at" not in data:
-        data["paid_at"] = datetime.now(timezone.utc)
+        data["paid_at"] = sp_now_naive()
     elif data.get("status") == "pending":
         data["paid_at"] = None
 

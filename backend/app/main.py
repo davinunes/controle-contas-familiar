@@ -64,9 +64,9 @@ async def lifespan(app: FastAPI):
     try:
         from app.services.occurrence_service import generate_occurrences_for_month
         from app.database import SessionLocal
-        from datetime import date
+        from app.timezone import sp_today
         with SessionLocal() as db_session:
-            today = date.today()
+            today = sp_today()
             count = generate_occurrences_for_month(db_session, today.year, today.month)
             if count > 0:
                 print(f"[Startup] {count} novas ocorrências geradas para {today.year}-{today.month:02d}", flush=True)

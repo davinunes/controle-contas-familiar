@@ -1,6 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from datetime import date
+from app.timezone import sp_today
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ def _run_monthly_job():
     from app.database import SessionLocal
     from app.services.occurrence_service import generate_occurrences_for_month
 
-    today = date.today()
+    today = sp_today()
     logger.info(f"[Scheduler] Gerando ocorrências para {today.year}-{today.month:02d}")
     db = SessionLocal()
     try:
