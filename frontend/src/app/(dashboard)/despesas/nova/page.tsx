@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { expensesApi, costCentersApi } from "@/lib/api";
 import { getActiveTenantId } from "@/lib/auth";
 import QRScanner from "@/components/QRScanner";
+import MoneyInput from "@/components/MoneyInput";
+import { parseCurrency } from "@/lib/money";
 
 interface Detail { label: string; value: string; }
 
@@ -18,6 +20,14 @@ export default function NovaDespesaPage() {
   const [costCenterId, setCostCenterId] = useState("");
   const [persons, setPersons] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [singleValue, setSingleValue]           = useState("");
+  const [singleDue, setSingleDue]               = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
   const [recurrenceDay, setRecDay]             = useState("");
   const [recurringValue, setRecurringValue]     = useState("");
   const [recurrencePeriod, setRecurrencePeriod] = useState<"monthly"|"yearly">("monthly");
@@ -59,7 +69,7 @@ export default function NovaDespesaPage() {
       };
       if (type === "installment") {
         payload.total_installments = parseInt(totalInst);
-        payload.installment_value  = parseFloat(instValue);
+        payload.installment_value  = parseCurrency(instValue) || 0;
         payload.first_due_date     = firstDue || null;
       }
       if (type === "recurring") {
@@ -68,13 +78,24 @@ export default function NovaDespesaPage() {
         if (recurrencePeriod === "yearly") {
           payload.recurrence_month = parseInt(recurrenceMonth) || 1;
         }
-        if (recurringValue.trim()) {
-          payload.recurring_value = parseFloat(recurringValue);
+        const recVal = parseCurrency(recurringValue);
+        if (recVal !== null) {
+          payload.recurring_value = recVal;
         }
         payload.important_details = details.filter(d => d.label && d.value);
       }
       if (type === "single") {
-        payload.recurrence_day = parseInt(recurrenceDay) || new Date().getDate();
+        if (singleDue) {
+          payload.first_due_date = singleDue;
+          const parts = singleDue.split("-");
+          payload.recurrence_day = parseInt(parts[2], 10) || new Date().getDate();
+        } else {
+          payload.recurrence_day = parseInt(recurrenceDay) || new Date().getDate();
+        }
+        const sVal = parseCurrency(singleValue);
+        if (sVal !== null) {
+          payload.recurring_value = sVal;
+        }
       }
       await expensesApi.create(tenantId, payload);
       router.push("/despesas");
@@ -183,13 +204,24 @@ export default function NovaDespesaPage() {
 
         {/* Campos condicionais */}
         {type === "single" && (
-          <div className="form-group">
-            <label className="form-label">Dia de Vencimento</label>
-            <input
-              type="number" className="form-input" min={1} max={31}
-              value={recurrenceDay} onChange={e => setRecDay(e.target.value)}
-              placeholder="Dia do mês (1-31)"
-            />
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Valor (R$)</label>
+              <MoneyInput
+                value={singleValue}
+                onChange={setSingleValue}
+                placeholder="0,00"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Data de Vencimento</label>
+              <input
+                type="date"
+                className="form-input"
+                value={singleDue}
+                onChange={e => setSingleDue(e.target.value)}
+              />
+            </div>
           </div>
         )}
 
@@ -206,10 +238,11 @@ export default function NovaDespesaPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Valor por Parcela *</label>
-                <input
-                  type="number" className="form-input" step="0.01" min={0} required
-                  value={instValue} onChange={e => setInstValue(e.target.value)}
-                  placeholder="Ex: 150.00"
+                <MoneyInput
+                  value={instValue}
+                  onChange={setInstValue}
+                  placeholder="0,00"
+                  required
                 />
               </div>
             </div>
@@ -285,10 +318,10 @@ export default function NovaDespesaPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">Valor Inicial / Fixo (R$)</label>
-                <input
-                  type="number" step="0.01" min="0" className="form-input"
-                  value={recurringValue} onChange={e => setRecurringValue(e.target.value)}
-                  placeholder="Ex: 150.00 (opcional)"
+                <MoneyInput
+                  value={recurringValue}
+                  onChange={setRecurringValue}
+                  placeholder="0,00 (opcional)"
                 />
               </div>
             </div>

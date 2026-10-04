@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { expensesApi, occurrencesApi, costCentersApi } from "@/lib/api";
+import MoneyInput from "@/components/MoneyInput";
+import { formatCurrencyFromNumber, parseCurrency } from "@/lib/money";
 
 const MONTHS_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
@@ -33,7 +35,8 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
           person_id: exp.person_id ? String(exp.person_id) : "",
           cost_center_id: exp.cost_center_id ? String(exp.cost_center_id) : "",
           recurrence_day: exp.recurrence_day || "",
-          recurring_value: exp.recurring_value != null ? String(exp.recurring_value) : "",
+          recurring_value: formatCurrencyFromNumber(exp.recurring_value),
+          installment_value: formatCurrencyFromNumber(exp.installment_value),
           recurrence_period: exp.recurrence_period || "monthly",
           recurrence_month: exp.recurrence_month ? String(exp.recurrence_month) : "1",
           important_details: exp.important_details || [],
@@ -99,7 +102,13 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
       if (expense.type === "recurring") {
         payload.recurrence_period = editData.recurrence_period || "monthly";
         payload.recurrence_month = editData.recurrence_period === "yearly" ? (Number(editData.recurrence_month) || 1) : null;
-        payload.recurring_value = editData.recurring_value ? Number(editData.recurring_value) : null;
+        payload.recurring_value = parseCurrency(editData.recurring_value);
+      }
+      if (expense.type === "single") {
+        payload.recurring_value = parseCurrency(editData.recurring_value);
+      }
+      if (expense.type === "installment") {
+        payload.installment_value = parseCurrency(editData.installment_value);
       }
       await expensesApi.update(Number(id), payload);
       const updated = await expensesApi.get(Number(id));
@@ -110,7 +119,8 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
         person_id: updated.person_id ? String(updated.person_id) : "",
         cost_center_id: updated.cost_center_id ? String(updated.cost_center_id) : "",
         recurrence_day: updated.recurrence_day || "",
-        recurring_value: updated.recurring_value != null ? String(updated.recurring_value) : "",
+        recurring_value: formatCurrencyFromNumber(updated.recurring_value),
+        installment_value: formatCurrencyFromNumber(updated.installment_value),
         recurrence_period: updated.recurrence_period || "monthly",
         recurrence_month: updated.recurrence_month ? String(updated.recurrence_month) : "1",
         important_details: updated.important_details || [],
@@ -221,6 +231,21 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Valor Inicial / Fixo</div>
                 <div style={{ fontWeight: 700, color: "var(--accent)" }}>{formatBRL(expense.recurring_value)}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {expense.type === "single" && expense.recurring_value != null && Number(expense.recurring_value) > 0 && (
+          <div className="grid-2">
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Valor da Despesa</div>
+              <div style={{ fontWeight: 700, color: "var(--accent)" }}>{formatBRL(expense.recurring_value)}</div>
+            </div>
+            {expense.recurrence_day && (
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Dia de Vencimento</div>
+                <div style={{ fontWeight: 700 }}>Dia {expense.recurrence_day}</div>
               </div>
             )}
           </div>
@@ -399,23 +424,102 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                         value={editData.recurrence_day}
                         onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
                     </div>
+              {expense.type === "installment" && (
+                <div className="form-group">
+                  <label className="form-label">Valor por Parcela (R$)</label>
+                  <MoneyInput
+                    placeholder="0,00"
+                    value={editData.installment_value || ""}
+                    onChange={val => setEditData((d: any) => ({ ...d, installment_value: val }))}
+                  />
+                </div>
+              )}
+
+              {expense.type === "recurring" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Periodicidade da Recorrência</label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditData((d: any) => ({ ...d, recurrence_period: "monthly" }))}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "var(--radius-md)",
+                          border: `2px solid ${editData.recurrence_period === "monthly" ? "var(--accent)" : "var(--border)"}`,
+                          background: editData.recurrence_period === "monthly" ? "var(--accent-dim)" : "var(--bg-elevated)",
+                          color: editData.recurrence_period === "monthly" ? "var(--accent-light)" : "var(--text-secondary)",
+                          fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+                        }}
+                      >
+                        🔄 Mensal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditData((d: any) => ({ ...d, recurrence_period: "yearly" }))}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "var(--radius-md)",
+                          border: `2px solid ${editData.recurrence_period === "yearly" ? "var(--accent)" : "var(--border)"}`,
+                          background: editData.recurrence_period === "yearly" ? "var(--accent-dim)" : "var(--bg-elevated)",
+                          color: editData.recurrence_period === "yearly" ? "var(--accent-light)" : "var(--text-secondary)",
+                          fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
+                        }}
+                      >
+                        📅 Anual
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid-2">
+                    {editData.recurrence_period === "yearly" && (
+                      <div className="form-group">
+                        <label className="form-label">Mês de Vencimento</label>
+                        <select
+                          className="form-input"
+                          value={editData.recurrence_month || "1"}
+                          onChange={e => setEditData((d: any) => ({ ...d, recurrence_month: e.target.value }))}
+                        >
+                          {["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((m, idx) => (
+                            <option key={idx + 1} value={idx + 1}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="form-group">
+                      <label className="form-label">Dia de Vencimento</label>
+                      <input type="number" className="form-input" min={1} max={31}
+                        value={editData.recurrence_day}
+                        onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
+                    </div>
                     <div className="form-group">
                       <label className="form-label">Valor Inicial / Fixo (R$)</label>
-                      <input type="number" step="0.01" min="0" className="form-input"
-                        placeholder="Ex: 150.00"
-                        value={editData.recurring_value}
-                        onChange={e => setEditData((d: any) => ({ ...d, recurring_value: e.target.value }))} />
+                      <MoneyInput
+                        placeholder="0,00"
+                        value={editData.recurring_value || ""}
+                        onChange={val => setEditData((d: any) => ({ ...d, recurring_value: val }))}
+                      />
                     </div>
                   </div>
                 </>
               )}
 
               {expense.type === "single" && (
-                <div className="form-group">
-                  <label className="form-label">Dia de Vencimento</label>
-                  <input type="number" className="form-input" min={1} max={31}
-                    value={editData.recurrence_day}
-                    onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Valor (R$)</label>
+                    <MoneyInput
+                      placeholder="0,00"
+                      value={editData.recurring_value || ""}
+                      onChange={val => setEditData((d: any) => ({ ...d, recurring_value: val }))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Dia de Vencimento</label>
+                    <input type="number" className="form-input" min={1} max={31}
+                      value={editData.recurrence_day}
+                      onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
+                  </div>
                 </div>
               )}
 

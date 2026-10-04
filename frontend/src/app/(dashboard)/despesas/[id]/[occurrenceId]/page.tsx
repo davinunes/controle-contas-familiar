@@ -6,6 +6,8 @@ import NfUrlPanel from "@/components/NfUrlPanel";
 import AttachmentUpload from "@/components/AttachmentUpload";
 import ArtifactStatusBadges from "@/components/ArtifactStatusBadges";
 import QRScanner from "@/components/QRScanner";
+import MoneyInput from "@/components/MoneyInput";
+import { formatCurrencyFromNumber, parseCurrency } from "@/lib/money";
 
 function formatBRL(v: number | string) {
   return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -38,7 +40,7 @@ export default function OccurrencePage({
       const data = await occurrencesApi.get(Number(occurrenceId));
       setOcc(data);
       setNotes(data.notes || "");
-      setValIn(String(Number(data.value)));
+      setValIn(formatCurrencyFromNumber(data.value));
     } finally {
       setLoading(false);
     }
@@ -73,8 +75,8 @@ export default function OccurrencePage({
   }
 
   async function handleSaveValue() {
-    const v = parseFloat(valueInput);
-    if (isNaN(v) || v < 0) return;
+    const v = parseCurrency(valueInput);
+    if (v === null || v < 0) return;
     await occurrencesApi.update(Number(occurrenceId), { value: v });
     setEditV(false);
     load();
@@ -142,11 +144,10 @@ export default function OccurrencePage({
             <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "4px" }}>Valor</div>
             {editingValue ? (
               <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                <input
-                  type="number" step="0.01" min="0"
-                  className="form-input" style={{ width: "120px", padding: "6px 10px" }}
+                <MoneyInput
+                  style={{ width: "130px", padding: "6px 10px 6px 36px" }}
                   value={valueInput}
-                  onChange={e => setValIn(e.target.value)}
+                  onChange={setValIn}
                   autoFocus
                 />
                 <button className="btn btn-primary btn-sm" onClick={handleSaveValue}>✓</button>
@@ -158,7 +159,7 @@ export default function OccurrencePage({
                   fontWeight: 800, fontSize: "1.5rem", cursor: "pointer",
                   color: isPaid ? "var(--success)" : "var(--text-primary)",
                 }}
-                onClick={() => { setValIn(String(Number(occ.value))); setEditV(true); }}
+                onClick={() => { setValIn(formatCurrencyFromNumber(occ.value)); setEditV(true); }}
                 title="Clique para editar o valor"
               >
                 {formatBRL(occ.value)}

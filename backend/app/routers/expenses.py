@@ -63,19 +63,26 @@ def create_expense(
         today = sp_today()
         _generate_installment_occurrences(db, expense)
 
-    # Para avulsas: gera 1 ocorrência no mês atual
+    # Para avulsas: gera 1 ocorrência no mês da data informada ou mês atual
     elif expense.type == "single":
-        today = sp_today()
-        ref_month = date(today.year, today.month, 1)
-        from calendar import monthrange
-        day = expense.recurrence_day or today.day
-        last_day = monthrange(today.year, today.month)[1]
+        if expense.first_due_date:
+            due = expense.first_due_date
+            ref_month = date(due.year, due.month, 1)
+        else:
+            today = sp_today()
+            ref_month = date(today.year, today.month, 1)
+            from calendar import monthrange
+            day = expense.recurrence_day or today.day
+            last_day = monthrange(today.year, today.month)[1]
+            due = date(today.year, today.month, min(day, last_day))
+
+        val = expense.recurring_value or 0
         occ = Occurrence(
             expense_id=expense.id,
             tenant_id=tenant_id,
             reference_month=ref_month,
-            value=0,
-            due_date=date(today.year, today.month, min(day, last_day)),
+            value=val,
+            due_date=due,
         )
         db.add(occ)
         db.commit()
@@ -178,6 +185,22 @@ def update_expense(
         setattr(expense, field, value)
     db.commit()
     db.refresh(expense)
+
+    # Se for avulsa e atualizou o valor ou data, sincroniza ocorrência pendente se existir
+    if expense.type == "single":
+        occ = db.query(Occurrence).filter(Occurrence.expense_id == expense.id).first()
+        if occ and occ.status == "pending":
+            if "recurring_value" in data and data["recurring_value"] is not None:
+                occ.value = data["recurring_value"]
+            if expense.first_due_date:
+                occ.due_date = expense.first_due_date
+                occ.reference_month = date(expense.first_due_date.year, expense.first_due_date.month, 1)
+            elif expense.recurrence_day:
+                from calendar import monthrange
+                last_day = monthrange(occ.due_date.year, occ.due_date.month)[1]
+                occ.due_date = date(occ.due_date.year, occ.due_date.month, min(expense.recurrence_day, last_day))
+            db.commit()
+
     return expense
 
 
