@@ -367,63 +367,7 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                   </select>
                 </div>
               </div>
-              {expense.type === "recurring" && (
-                <>
-                  <div className="form-group">
-                    <label className="form-label">Periodicidade da Recorrência</label>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                      <button
-                        type="button"
-                        onClick={() => setEditData((d: any) => ({ ...d, recurrence_period: "monthly" }))}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "var(--radius-md)",
-                          border: `2px solid ${editData.recurrence_period === "monthly" ? "var(--accent)" : "var(--border)"}`,
-                          background: editData.recurrence_period === "monthly" ? "var(--accent-dim)" : "var(--bg-elevated)",
-                          color: editData.recurrence_period === "monthly" ? "var(--accent-light)" : "var(--text-secondary)",
-                          fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
-                        }}
-                      >
-                        🔄 Mensal
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditData((d: any) => ({ ...d, recurrence_period: "yearly" }))}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: "var(--radius-md)",
-                          border: `2px solid ${editData.recurrence_period === "yearly" ? "var(--accent)" : "var(--border)"}`,
-                          background: editData.recurrence_period === "yearly" ? "var(--accent-dim)" : "var(--bg-elevated)",
-                          color: editData.recurrence_period === "yearly" ? "var(--accent-light)" : "var(--text-secondary)",
-                          fontWeight: 600, fontSize: "0.85rem", cursor: "pointer",
-                        }}
-                      >
-                        📅 Anual
-                      </button>
-                    </div>
-                  </div>
 
-                  <div className="grid-2">
-                    {editData.recurrence_period === "yearly" && (
-                      <div className="form-group">
-                        <label className="form-label">Mês de Vencimento</label>
-                        <select
-                          className="form-input"
-                          value={editData.recurrence_month || "1"}
-                          onChange={e => setEditData((d: any) => ({ ...d, recurrence_month: e.target.value }))}
-                        >
-                          {["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((m, idx) => (
-                            <option key={idx + 1} value={idx + 1}>{m}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="form-group">
-                      <label className="form-label">Dia de Vencimento</label>
-                      <input type="number" className="form-input" min={1} max={31}
-                        value={editData.recurrence_day}
-                        onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
-                    </div>
               {expense.type === "installment" && (
                 <div className="form-group">
                   <label className="form-label">Valor por Parcela (R$)</label>
