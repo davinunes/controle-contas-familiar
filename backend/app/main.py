@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.database import engine, SessionLocal
-from app.models import Tenant, User, UserTenant, RefreshToken, Expense, Occurrence, Attachment
+from app.models import Tenant, User, UserTenant, RefreshToken, Expense, Occurrence, Attachment, OccurrencePayment, InvoiceItem
 from app.database import Base
 from app.scheduler import start_scheduler, stop_scheduler
 from app.routers import auth, tenants, cost_centers, users, expenses, occurrences, attachments, dashboard
@@ -51,6 +51,9 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE expenses ADD COLUMN recurring_value NUMERIC(10, 2) NULL",
             "ALTER TABLE expenses ADD COLUMN recurrence_period VARCHAR(20) DEFAULT 'monthly'",
             "ALTER TABLE expenses ADD COLUMN recurrence_month INT NULL",
+            "ALTER TABLE expenses ADD COLUMN card_closing_day INT NULL",
+            "ALTER TABLE expenses MODIFY COLUMN type ENUM('single', 'installment', 'recurring', 'credit_card') NOT NULL DEFAULT 'single'",
+            "ALTER TABLE expense_occurrences MODIFY COLUMN status ENUM('pending', 'partially_paid', 'paid') NOT NULL DEFAULT 'pending'",
         ]:
             try:
                 conn.execute(text(sql))

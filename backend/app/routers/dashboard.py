@@ -54,8 +54,10 @@ def get_resumo(
             pass
 
     # Ocorrências do mês
+    from sqlalchemy.orm import selectinload
     current_occs = (
         db.query(Occurrence)
+        .options(selectinload(Occurrence.payments))
         .filter(
             Occurrence.tenant_id == tenant_id,
             Occurrence.reference_month == ref_month,
@@ -64,12 +66,13 @@ def get_resumo(
         .all()
     )
 
-    # Vencidas de meses anteriores (apenas pendentes)
+    # Vencidas de meses anteriores (pendentes ou parcialmente pagas)
     overdue_occs = (
         db.query(Occurrence)
+        .options(selectinload(Occurrence.payments))
         .filter(
             Occurrence.tenant_id == tenant_id,
-            Occurrence.status == "pending",
+            Occurrence.status.in_(["pending", "partially_paid"]),
             Occurrence.reference_month < ref_month,
         )
         .order_by(Occurrence.due_date)
@@ -85,10 +88,13 @@ def get_resumo(
             occurrence_id=occ.id,
             expense_id=occ.expense_id,
             expense_title=expense.title if expense else "—",
+            expense_type=expense.type if expense else None,
             value=occ.value,
+            paid_amount=occ.paid_amount,
+            remaining_amount=occ.remaining_amount,
             due_date=occ.due_date,
             status=occ.status,
-            is_overdue=occ.status == "pending" and occ.due_date < today,
+            is_overdue=occ.status in ["pending", "partially_paid"] and occ.due_date < today,
             reference_month=occ.reference_month,
             has_boleto=_has_attachment(db, occ.id, "boleto"),
             has_danfe=_has_attachment(db, occ.id, "danfe"),
@@ -129,18 +135,21 @@ def get_whatsapp_text(
     def fmt_brl(v: Decimal) -> str:
         return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+    from sqlalchemy.orm import selectinload
     # Filtro base
     q_overdue = (
         db.query(Occurrence)
+        .options(selectinload(Occurrence.payments))
         .join(Expense, Occurrence.expense_id == Expense.id)
         .filter(
             Occurrence.tenant_id == tenant_id,
-            Occurrence.status == "pending",
+            Occurrence.status.in_(["pending", "partially_paid"]),
             Occurrence.reference_month < ref_month,
         )
     )
     q_current = (
         db.query(Occurrence)
+        .options(selectinload(Occurrence.payments))
         .join(Expense, Occurrence.expense_id == Expense.id)
         .filter(
             Occurrence.tenant_id == tenant_id,
@@ -172,14 +181,18 @@ def get_whatsapp_text(
             title = expense.title if expense else "—"
             p_tag = f" [{expense.person.name}]" if (expense and expense.person and not person_id) else ""
             ref_label = occ.reference_month.strftime("%b").capitalize()
-            lines.append(f"  • {title}{p_tag} ({ref_label}) — {fmt_brl(occ.value)}")
-            total_pending += occ.value
+            val_to_pay = occ.remaining_amount if occ.status == "partially_paid" else occ.value
+            if occ.status == "partially_paid":
+                lines.append(f"  • {title}{p_tag} ({ref_label}) — {fmt_brl(val_to_pay)} rest. (de {fmt_brl(occ.value)})")
+            else:
+                lines.append(f"  • {title}{p_tag} ({ref_label}) — {fmt_brl(occ.value)}")
+            total_pending += val_to_pay
             p_name = expense.person.name if (expense and expense.person) else "Geral"
-            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + occ.value
+            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + val_to_pay
 
     if current:
         lines.append(f"\n📋 *{month_pt}/{ref_month.year}:*")
-        pending_this = [o for o in current if o.status == "pending"]
+        pending_this = [o for o in current if o.status in ["pending", "partially_paid"]]
         paid_this    = [o for o in current if o.status == "paid"]
 
         for occ in pending_this:
@@ -187,10 +200,14 @@ def get_whatsapp_text(
             title = expense.title if expense else "—"
             p_tag = f" [{expense.person.name}]" if (expense and expense.person and not person_id) else ""
             due_label = occ.due_date.strftime("%d/%m")
-            lines.append(f"  • {title}{p_tag} — {fmt_brl(occ.value)} | Vence {due_label}")
-            total_pending += occ.value
+            val_to_pay = occ.remaining_amount if occ.status == "partially_paid" else occ.value
+            if occ.status == "partially_paid":
+                lines.append(f"  • {title}{p_tag} — {fmt_brl(val_to_pay)} rest. (de {fmt_brl(occ.value)}) | Vence {due_label}")
+            else:
+                lines.append(f"  • {title}{p_tag} — {fmt_brl(occ.value)} | Vence {due_label}")
+            total_pending += val_to_pay
             p_name = expense.person.name if (expense and expense.person) else "Geral"
-            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + occ.value
+            person_totals[p_name] = person_totals.get(p_name, Decimal("0")) + val_to_pay
 
         for occ in paid_this:
             expense = db.query(Expense).filter(Expense.id == occ.expense_id).first()

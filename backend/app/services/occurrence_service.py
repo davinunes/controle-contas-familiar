@@ -84,6 +84,19 @@ def generate_occurrences_for_month(db: Session, year: int, month: int, tenant_id
                 db.add(occ)
                 created += 1
 
+        elif expense.type == ExpenseType.credit_card:
+            # Fatura de Cartão: gera ocorrência mensal para receber as compras
+            day = expense.recurrence_day or 10
+            occ = Occurrence(
+                expense_id=expense.id,
+                tenant_id=expense.tenant_id,
+                reference_month=reference_month,
+                value=0,
+                due_date=_due_date_for_month(day, year, month),
+            )
+            db.add(occ)
+            created += 1
+
         # Avulsas (single) não são geradas automaticamente
 
     db.commit()
@@ -91,7 +104,7 @@ def generate_occurrences_for_month(db: Session, year: int, month: int, tenant_id
 
 
 def get_pending_overdue(db: Session, tenant_id: int) -> list[Occurrence]:
-    """Retorna ocorrências pendentes com due_date anterior ao mês atual."""
+    """Retorna ocorrências pendentes ou parcialmente pagas com due_date anterior ao mês atual."""
     today = sp_today()
     current_month = _first_of_month(today.year, today.month)
     return (
@@ -99,7 +112,7 @@ def get_pending_overdue(db: Session, tenant_id: int) -> list[Occurrence]:
         .filter(
             and_(
                 Occurrence.tenant_id == tenant_id,
-                Occurrence.status == "pending",
+                Occurrence.status.in_(["pending", "partially_paid"]),
                 Occurrence.reference_month < current_month,
             )
         )

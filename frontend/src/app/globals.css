@@ -216,6 +216,7 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   letter-spacing: 0.05em;
 }
 .badge-pending  { background: var(--warning-dim); color: var(--warning); }
+.badge-partial  { background: rgba(234, 179, 8, 0.15); color: #ca8a04; border: 1px solid rgba(234, 179, 8, 0.3); }
 .badge-paid     { background: var(--success-dim); color: var(--success); }
 .badge-overdue  { background: var(--danger-dim);  color: var(--danger);  }
 .badge-info     { background: var(--info-dim);    color: var(--info);    }

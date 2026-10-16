@@ -21,20 +21,21 @@ class QuickQrCreate(BaseModel):
 class ExpenseCreate(BaseModel):
     title:              str  = Field(..., min_length=2, max_length=200)
     description:        Optional[str] = None
-    type:               str  = Field(..., pattern="^(single|installment|recurring)$")
+    type:               str  = Field(..., pattern="^(single|installment|recurring|credit_card)$")
     cost_center_id:     Optional[int] = None
     person_id:          Optional[int] = None
     total_installments: Optional[int] = None
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = Field(None, ge=1, le=31)
+    card_closing_day:   Optional[int] = Field(None, ge=1, le=31)
     recurring_value:    Optional[Decimal] = None
     recurrence_period:  Optional[str] = Field("monthly", pattern="^(monthly|yearly)$")
     recurrence_month:   Optional[int] = Field(None, ge=1, le=12)
     important_details:  Optional[List[ImportantDetail]] = None
 
 
-    @field_validator("cost_center_id", "person_id", "recurrence_day", "recurring_value", "recurrence_month", mode="before")
+    @field_validator("cost_center_id", "person_id", "recurrence_day", "card_closing_day", "recurring_value", "recurrence_month", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -51,13 +52,14 @@ class ExpenseUpdate(BaseModel):
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = Field(None, ge=1, le=31)
+    card_closing_day:   Optional[int] = Field(None, ge=1, le=31)
     recurring_value:    Optional[Decimal] = None
     recurrence_period:  Optional[str] = Field(None, pattern="^(monthly|yearly)$")
     recurrence_month:   Optional[int] = Field(None, ge=1, le=12)
     important_details:  Optional[List[ImportantDetail]] = None
     active:             Optional[bool] = None
 
-    @field_validator("cost_center_id", "person_id", "recurrence_day", "recurring_value", "recurrence_month", mode="before")
+    @field_validator("cost_center_id", "person_id", "recurrence_day", "card_closing_day", "recurring_value", "recurrence_month", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -79,6 +81,7 @@ class ExpenseOut(BaseModel):
     installment_value:  Optional[Decimal] = None
     first_due_date:     Optional[date] = None
     recurrence_day:     Optional[int] = None
+    card_closing_day:   Optional[int] = None
     recurring_value:    Optional[Decimal] = None
     recurrence_period:  Optional[str] = "monthly"
     recurrence_month:   Optional[int] = None
@@ -86,6 +89,64 @@ class ExpenseOut(BaseModel):
     active:             bool = True
     created_at:         datetime
     updated_at:         datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Occurrence Payments ───────────────────────────────────────
+class OccurrencePaymentCreate(BaseModel):
+    amount:         Decimal = Field(..., gt=0)
+    paid_at:        Optional[datetime] = None
+    payment_method: Optional[str] = None
+    notes:          Optional[str] = None
+
+
+class OccurrencePaymentOut(BaseModel):
+    id:             int
+    occurrence_id:  int
+    tenant_id:      int
+    amount:         Decimal
+    paid_at:        datetime
+    payment_method: Optional[str] = None
+    notes:          Optional[str] = None
+    created_at:     datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Invoice Items (Cartão de Crédito) ─────────────────────────
+class InvoiceItemCreate(BaseModel):
+    description:    str = Field(..., min_length=1, max_length=200)
+    amount:         Decimal = Field(..., gt=0)
+    purchase_date:  date
+    cost_center_id: Optional[int] = None
+    person_id:      Optional[int] = None
+    notes:          Optional[str] = None
+
+
+class InvoiceItemUpdate(BaseModel):
+    description:    Optional[str] = None
+    amount:         Optional[Decimal] = Field(None, gt=0)
+    purchase_date:  Optional[date] = None
+    cost_center_id: Optional[int] = None
+    person_id:      Optional[int] = None
+    notes:          Optional[str] = None
+
+
+class InvoiceItemOut(BaseModel):
+    id:             int
+    occurrence_id:  int
+    tenant_id:      int
+    description:    str
+    amount:         Decimal
+    purchase_date:  date
+    cost_center_id: Optional[int] = None
+    person_id:      Optional[int] = None
+    notes:          Optional[str] = None
+    cost_center:    Optional[CostCenterBrief] = None
+    person:         Optional[CostCenterBrief] = None
+    created_at:     datetime
+    updated_at:     datetime
 
     model_config = {"from_attributes": True}
 
@@ -102,12 +163,12 @@ class OccurrenceCreate(BaseModel):
 
 
 class OccurrenceUpdate(BaseModel):
-    value:   Optional[Decimal] = None
-    due_date: Optional[date]   = None
-    nf_url:  Optional[str]     = None
-    status:  Optional[str]     = Field(None, pattern="^(pending|paid)$")
-    paid_at: Optional[datetime] = None
-    notes:   Optional[str]     = None
+    value:    Optional[Decimal]  = None
+    due_date: Optional[date]     = None
+    nf_url:   Optional[str]      = None
+    status:   Optional[str]      = Field(None, pattern="^(pending|partially_paid|paid)$")
+    paid_at:  Optional[datetime] = None
+    notes:    Optional[str]      = None
 
 
 class AttachmentBrief(BaseModel):
@@ -133,6 +194,10 @@ class OccurrenceOut(BaseModel):
     paid_at:            Optional[datetime] = None
     notes:              Optional[str] = None
     attachments:        List[AttachmentBrief] = []
+    payments:           List[OccurrencePaymentOut] = []
+    invoice_items:      List[InvoiceItemOut] = []
+    paid_amount:        Decimal = Decimal("0")
+    remaining_amount:   Decimal = Decimal("0")
     expense:            Optional[ExpenseOut] = None
     created_at:         datetime
     updated_at:         datetime
@@ -161,7 +226,10 @@ class ResumoItem(BaseModel):
     occurrence_id:     int
     expense_id:        int
     expense_title:     str
+    expense_type:      Optional[str] = None
     value:             Decimal
+    paid_amount:       Decimal = Decimal("0")
+    remaining_amount:  Decimal = Decimal("0")
     due_date:          date
     status:            str
     is_overdue:        bool

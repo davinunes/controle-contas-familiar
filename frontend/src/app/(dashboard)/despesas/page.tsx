@@ -10,6 +10,7 @@ const TYPE_LABELS: Record<string, string> = {
   single:      "⚡ Avulsa",
   installment: "📦 Parcelada",
   recurring:   "🔄 Recorrente",
+  credit_card: "💳 Cartão de Crédito",
 };
 
 export default function DespesasPage() {

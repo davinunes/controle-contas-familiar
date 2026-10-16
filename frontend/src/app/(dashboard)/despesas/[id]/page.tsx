@@ -35,6 +35,7 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
           person_id: exp.person_id ? String(exp.person_id) : "",
           cost_center_id: exp.cost_center_id ? String(exp.cost_center_id) : "",
           recurrence_day: exp.recurrence_day || "",
+          card_closing_day: exp.card_closing_day || "",
           recurring_value: formatCurrencyFromNumber(exp.recurring_value),
           installment_value: formatCurrencyFromNumber(exp.installment_value),
           recurrence_period: exp.recurrence_period || "monthly",
@@ -99,6 +100,11 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
       } else {
         payload.recurrence_day = null;
       }
+      if (editData.card_closing_day !== "" && editData.card_closing_day != null) {
+        payload.card_closing_day = Number(editData.card_closing_day);
+      } else {
+        payload.card_closing_day = null;
+      }
       if (expense.type === "recurring") {
         payload.recurrence_period = editData.recurrence_period || "monthly";
         payload.recurrence_month = editData.recurrence_period === "yearly" ? (Number(editData.recurrence_month) || 1) : null;
@@ -119,6 +125,7 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
         person_id: updated.person_id ? String(updated.person_id) : "",
         cost_center_id: updated.cost_center_id ? String(updated.cost_center_id) : "",
         recurrence_day: updated.recurrence_day || "",
+        card_closing_day: updated.card_closing_day || "",
         recurring_value: formatCurrencyFromNumber(updated.recurring_value),
         installment_value: formatCurrencyFromNumber(updated.installment_value),
         recurrence_period: updated.recurrence_period || "monthly",
@@ -169,7 +176,7 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
             background: "var(--accent-dim)", color: "var(--accent-light)",
             fontSize: "0.8rem", fontWeight: 600,
           }}>
-            {expense.type === "single" ? "⚡ Avulsa" : expense.type === "installment" ? "📦 Parcelada" : "🔄 Recorrente"}
+            {expense.type === "single" ? "⚡ Avulsa" : expense.type === "installment" ? "📦 Parcelada" : expense.type === "credit_card" ? "💳 Fatura de Cartão" : "🔄 Recorrente"}
           </span>
           {expense.person && (
             <span style={{
@@ -236,6 +243,21 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
           </div>
         )}
 
+        {expense.type === "credit_card" && (
+          <div className="grid-2">
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Dia de Vencimento da Fatura</div>
+              <div style={{ fontWeight: 700, color: "var(--accent)" }}>Todo dia {expense.recurrence_day || 10}</div>
+            </div>
+            {expense.card_closing_day && (
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Dia de Fechamento</div>
+                <div style={{ fontWeight: 700 }}>Dia {expense.card_closing_day}</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {expense.type === "single" && expense.recurring_value != null && Number(expense.recurring_value) > 0 && (
           <div className="grid-2">
             <div>
@@ -293,13 +315,14 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
             const ref = new Date(occ.reference_month);
             const label = `${MONTHS_PT[ref.getMonth()]}/${ref.getFullYear()}`;
             const isPaid = occ.status === "paid";
+            const isPartial = occ.status === "partially_paid";
             return (
               <div
                 key={occ.id}
                 className="card"
                 style={{
                   padding: "12px 14px", cursor: "pointer",
-                  borderLeft: `3px solid ${isPaid ? "var(--success)" : "var(--accent)"}`,
+                  borderLeft: `3px solid ${isPaid ? "var(--success)" : isPartial ? "#eab308" : "var(--accent)"}`,
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                 }}
                 onClick={() => router.push(`/despesas/${id}/${occ.id}`)}
@@ -313,9 +336,18 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                   <span style={{ fontWeight: 700 }}>{formatBRL(occ.value)}</span>
-                  <span className={`badge badge-${isPaid ? "paid" : "pending"}`} style={{ fontSize: "0.7rem" }}>
-                    {isPaid ? "Pago" : "Pendente"}
-                  </span>
+                  {isPartial ? (
+                    <span style={{
+                      fontSize: "0.7rem", fontWeight: 700, padding: "2px 8px", borderRadius: "var(--radius-full)",
+                      background: "rgba(234, 179, 8, 0.15)", color: "#ca8a04", border: "1px solid rgba(234, 179, 8, 0.3)"
+                    }}>
+                      Parcial (Resta {formatBRL(occ.remaining_amount || 0)})
+                    </span>
+                  ) : (
+                    <span className={`badge badge-${isPaid ? "paid" : "pending"}`} style={{ fontSize: "0.7rem" }}>
+                      {isPaid ? "Pago" : "Pendente"}
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -463,6 +495,23 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                     <input type="number" className="form-input" min={1} max={31}
                       value={editData.recurrence_day}
                       onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
+                  </div>
+                </div>
+              {expense.type === "credit_card" && (
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Dia do Fechamento da Fatura</label>
+                    <input type="number" className="form-input" min={1} max={31}
+                      value={editData.card_closing_day || ""}
+                      onChange={e => setEditData((d: any) => ({ ...d, card_closing_day: e.target.value }))}
+                      placeholder="Ex: 3" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Dia de Vencimento da Fatura</label>
+                    <input type="number" className="form-input" min={1} max={31}
+                      value={editData.recurrence_day || ""}
+                      onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))}
+                      placeholder="Ex: 10" />
                   </div>
                 </div>
               )}

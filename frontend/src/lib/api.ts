@@ -141,6 +141,22 @@ export const occurrencesApi = {
     request<any>(`/occurrences/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<void>(`/occurrences/${id}`, { method: "DELETE" }),
+  // Pagamentos Parciais
+  listPayments: (occId: number) =>
+    request<any[]>(`/occurrences/${occId}/payments`),
+  addPayment: (occId: number, data: { amount: number; paid_at?: string; payment_method?: string; notes?: string }) =>
+    request<any>(`/occurrences/${occId}/payments`, { method: "POST", body: JSON.stringify(data) }),
+  deletePayment: (occId: number, paymentId: number) =>
+    request<void>(`/occurrences/${occId}/payments/${paymentId}`, { method: "DELETE" }),
+  // Itens da Fatura de Cartão
+  listInvoiceItems: (occId: number) =>
+    request<any[]>(`/occurrences/${occId}/invoice-items`),
+  addInvoiceItem: (occId: number, data: { description: string; amount: number; purchase_date: string; cost_center_id?: number | null; person_id?: number | null; notes?: string }) =>
+    request<any>(`/occurrences/${occId}/invoice-items`, { method: "POST", body: JSON.stringify(data) }),
+  updateInvoiceItem: (occId: number, itemId: number, data: any) =>
+    request<any>(`/occurrences/${occId}/invoice-items/${itemId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteInvoiceItem: (occId: number, itemId: number) =>
+    request<void>(`/occurrences/${occId}/invoice-items/${itemId}`, { method: "DELETE" }),
 };
 
 // Attachments

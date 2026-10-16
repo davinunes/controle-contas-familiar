@@ -144,29 +144,37 @@ export default function ResumoPage() {
   // Separa vencidas vs. do mês (comparação direta YYYY-MM imune a fuso horário)
   const overdue = displayedItems.filter(i => {
     const itemMonth = (i.reference_month || "").slice(0, 7);
-    return itemMonth < month && i.status === "pending";
+    return itemMonth < month && (i.status === "pending" || i.status === "partially_paid");
   });
   const current = displayedItems.filter(i => {
     const itemMonth = (i.reference_month || "").slice(0, 7);
     return itemMonth >= month;
   });
 
-  const currentPending = current.filter(i => i.status === "pending");
+  const currentPending = current.filter(i => i.status === "pending" || i.status === "partially_paid");
   const currentPaid    = current.filter(i => i.status === "paid");
 
   const totalPending = displayedItems
-    .filter(i => i.status === "pending")
-    .reduce((s, i) => s + Number(i.value), 0);
+    .filter(i => i.status === "pending" || i.status === "partially_paid")
+    .reduce((s, i) => {
+      const v = i.status === "partially_paid" && i.remaining_amount != null
+        ? Number(i.remaining_amount)
+        : Number(i.value);
+      return s + v;
+    }, 0);
 
   // Subtotais por pessoa
   const personSubtotals = items
-    .filter(i => i.status === "pending")
+    .filter(i => i.status === "pending" || i.status === "partially_paid")
     .reduce((acc: Record<string, { name: string; color: string; total: number }>, i) => {
       const key = i.person_id ? String(i.person_id) : "geral";
       const name = i.person_name || "Geral";
       const color = i.person_color || "var(--accent)";
       if (!acc[key]) acc[key] = { name, color, total: 0 };
-      acc[key].total += Number(i.value);
+      const v = i.status === "partially_paid" && i.remaining_amount != null
+        ? Number(i.remaining_amount)
+        : Number(i.value);
+      acc[key].total += v;
       return acc;
     }, {});
 
@@ -476,6 +484,8 @@ function ExpenseCard({
   onPay: (id: number) => void;
 }) {
   const isPaid = item.status === "paid";
+  const isPartial = item.status === "partially_paid";
+  const isCard = item.expense_type === "credit_card";
   const router = useRouter();
 
   const attachments = [
@@ -489,7 +499,7 @@ function ExpenseCard({
       className="card"
       style={{
         marginBottom: "10px",
-        borderLeft: `3px solid ${isPaid ? "var(--success)" : overdue ? "var(--danger)" : "var(--accent)"}`,
+        borderLeft: `3px solid ${isPaid ? "var(--success)" : isPartial ? "#eab308" : overdue ? "var(--danger)" : "var(--accent)"}`,
         cursor: "pointer",
         padding: "14px 16px",
       }}
@@ -497,13 +507,23 @@ function ExpenseCard({
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontWeight: 600, fontSize: "0.95rem",
-            color: isPaid ? "var(--text-muted)" : "var(--text-primary)",
-            textDecoration: isPaid ? "line-through" : "none",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {item.expense_title}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{
+              fontWeight: 600, fontSize: "0.95rem",
+              color: isPaid ? "var(--text-muted)" : "var(--text-primary)",
+              textDecoration: isPaid ? "line-through" : "none",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {item.expense_title}
+            </span>
+            {isCard && (
+              <span style={{
+                fontSize: "0.68rem", padding: "1px 6px", borderRadius: "var(--radius-full)",
+                background: "rgba(59,130,246,0.12)", color: "#3b82f6", fontWeight: 700,
+              }}>
+                💳 Fatura
+              </span>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center", flexWrap: "wrap" }}>
@@ -551,22 +571,31 @@ function ExpenseCard({
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
           <span style={{
             fontWeight: 700, fontSize: "1rem",
-            color: isPaid ? "var(--success)" : overdue ? "var(--danger)" : "var(--text-primary)",
+            color: isPaid ? "var(--success)" : isPartial ? "#ca8a04" : overdue ? "var(--danger)" : "var(--text-primary)",
           }}>
-            {formatBRL(item.value)}
+            {formatBRL(isPartial ? (item.remaining_amount || item.value) : item.value)}
           </span>
+
+          {isPartial && (
+            <span style={{
+              fontSize: "0.68rem", fontWeight: 700, padding: "1px 6px", borderRadius: "var(--radius-full)",
+              background: "rgba(234, 179, 8, 0.15)", color: "#ca8a04",
+            }}>
+              Total: {formatBRL(item.value)} · Pago: {formatBRL(item.paid_amount || 0)}
+            </span>
+          )}
 
           {!isPaid && (
             <button
               className="btn btn-success btn-sm"
               onClick={e => { e.stopPropagation(); onPay(item.occurrence_id); }}
               disabled={marking === item.occurrence_id}
-              style={{ fontSize: "0.75rem", padding: "4px 10px" }}
+              style={{ fontSize: "0.75rem", padding: "4px 10px", marginTop: "2px" }}
             >
-              {marking === item.occurrence_id ? "..." : "✅ Pagar"}
+              {marking === item.occurrence_id ? "..." : isPartial ? "✓ Quitar Saldo" : "✅ Pagar"}
             </button>
           )}
           {isPaid && (

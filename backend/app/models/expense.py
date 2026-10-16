@@ -10,6 +10,7 @@ class ExpenseType(str, enum.Enum):
     single      = "single"       # Avulsa (não se repete)
     installment = "installment"  # Parcelada (N×valor fixo)
     recurring   = "recurring"    # Recorrente (mensal, valor variável)
+    credit_card = "credit_card"  # Fatura de Cartão de Crédito
 
 
 class Expense(Base):
@@ -19,18 +20,19 @@ class Expense(Base):
     tenant_id          = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
     title              = Column(String(200), nullable=False)
     description        = Column(Text, nullable=True)
-    type               = Column(Enum("single", "installment", "recurring"), nullable=False, default="single")
+    type               = Column(Enum("single", "installment", "recurring", "credit_card"), nullable=False, default="single")
 
     # Parceladas
     total_installments = Column(Integer, nullable=True)
     installment_value  = Column(Numeric(10, 2), nullable=True)
     first_due_date     = Column(Date, nullable=True)
 
-    # Recorrentes e avulsas
-    recurrence_day     = Column(Integer, nullable=True)
+    # Recorrentes e avulsas / Faturas de Cartão
+    recurrence_day     = Column(Integer, nullable=True)     # Dia de vencimento (ou vencimento da fatura)
+    card_closing_day   = Column(Integer, nullable=True)     # Dia de fechamento da fatura do cartão
     recurring_value    = Column(Numeric(10, 2), nullable=True)
     recurrence_period  = Column(String(20), nullable=False, default="monthly")  # 'monthly' | 'yearly'
-    recurrence_month   = Column(Integer, nullable=True)  # 1 a 12 (se yearly)
+    recurrence_month   = Column(Integer, nullable=True)     # 1 a 12 (se yearly)
 
     # Detalhes importantes (ex: código concessionária, UC, site)
     important_details  = Column(JSON, nullable=True)  # List[{label: str, value: str}]

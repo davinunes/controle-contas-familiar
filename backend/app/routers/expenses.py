@@ -113,6 +113,24 @@ def create_expense(
             db.add(occ)
             db.commit()
 
+    # Para cartões de crédito: gera ocorrência no mês atual pronta para lançamentos de compras
+    elif expense.type == "credit_card":
+        today = sp_today()
+        ref_month = date(today.year, today.month, 1)
+        from calendar import monthrange
+        day = expense.recurrence_day or 10
+        last_day = monthrange(today.year, today.month)[1]
+        due = date(today.year, today.month, min(day, last_day))
+        occ = Occurrence(
+            expense_id=expense.id,
+            tenant_id=tenant_id,
+            reference_month=ref_month,
+            value=0,
+            due_date=due,
+        )
+        db.add(occ)
+        db.commit()
+
     return expense
 
 

@@ -13,7 +13,7 @@ export default function NovaDespesaPage() {
   const router   = useRouter();
   const tenantId = getActiveTenantId();
 
-  const [type, setType]   = useState<"single"|"installment"|"recurring">("single");
+  const [type, setType]   = useState<"single"|"installment"|"recurring"|"credit_card">("single");
   const [title, setTitle] = useState("");
   const [description, setDesc] = useState("");
   const [personId, setPersonId] = useState("");
@@ -29,6 +29,7 @@ export default function NovaDespesaPage() {
     return `${y}-${m}-${d}`;
   });
   const [recurrenceDay, setRecDay]             = useState("");
+  const [cardClosingDay, setCardClosingDay]     = useState("");
   const [recurringValue, setRecurringValue]     = useState("");
   const [recurrencePeriod, setRecurrencePeriod] = useState<"monthly"|"yearly">("monthly");
   const [recurrenceMonth, setRecurrenceMonth]   = useState("1");
@@ -84,6 +85,10 @@ export default function NovaDespesaPage() {
         }
         payload.important_details = details.filter(d => d.label && d.value);
       }
+      if (type === "credit_card") {
+        payload.recurrence_day   = parseInt(recurrenceDay) || 10;
+        payload.card_closing_day = cardClosingDay ? parseInt(cardClosingDay) : null;
+      }
       if (type === "single") {
         if (singleDue) {
           payload.first_due_date = singleDue;
@@ -125,8 +130,8 @@ export default function NovaDespesaPage() {
         {/* Tipo */}
         <div className="form-group">
           <label className="form-label">Tipo</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-            {(["single","installment","recurring"] as const).map(t => (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "8px" }}>
+            {(["single","installment","recurring","credit_card"] as const).map(t => (
               <button
                 key={t} type="button"
                 onClick={() => setType(t)}
@@ -146,6 +151,7 @@ export default function NovaDespesaPage() {
                 {t === "single"      && <><div>⚡</div>Avulsa</>}
                 {t === "installment" && <><div>📦</div>Parcelada</>}
                 {t === "recurring"   && <><div>🔄</div>Recorrente</>}
+                {t === "credit_card" && <><div>💳</div>Cartão</>}
               </button>
             ))}
           </div>
@@ -368,6 +374,43 @@ export default function NovaDespesaPage() {
               )}
             </div>
           </>
+        )}
+
+        {type === "credit_card" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div className="grid-2">
+              <div className="form-group">
+                <label className="form-label">Dia do Fechamento da Fatura</label>
+                <input
+                  type="number" className="form-input" min={1} max={31}
+                  value={cardClosingDay} onChange={e => setCardClosingDay(e.target.value)}
+                  placeholder="Ex: 3"
+                />
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", display: "block" }}>
+                  Dia em que fecha a fatura mensal
+                </span>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dia de Vencimento da Fatura *</label>
+                <input
+                  type="number" className="form-input" min={1} max={31} required
+                  value={recurrenceDay} onChange={e => setRecDay(e.target.value)}
+                  placeholder="Ex: 10"
+                />
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", display: "block" }}>
+                  Dia limite para pagamento
+                </span>
+              </div>
+            </div>
+
+            <div style={{
+              padding: "14px 16px", borderRadius: "var(--radius-md)",
+              background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)",
+              fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5,
+            }}>
+              💡 <strong>Como funciona a Fatura de Cartão:</strong> Uma fatura para o mês atual será criada automaticamente. Você poderá lançar compras individuais (com valor, data, descrição, responsável e categoria) dentro da fatura, e pagar tudo junto ou em pagamentos parciais!
+            </div>
+          </div>
         )}
 
         {error && (
