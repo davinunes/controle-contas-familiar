@@ -497,6 +497,8 @@ export default function ExpenseDetailPage({ params }: { params: { id: string } }
                       onChange={e => setEditData((d: any) => ({ ...d, recurrence_day: e.target.value }))} />
                   </div>
                 </div>
+              )}
+
               {expense.type === "credit_card" && (
                 <div className="grid-2">
                   <div className="form-group">
